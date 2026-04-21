@@ -9,7 +9,8 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
-import { Trophy, Target, Star, Save, Sparkles, AlertCircle } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Trophy, Target, Star, Save, Sparkles, AlertCircle, Award } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface PlayerMatchInput {
@@ -26,6 +27,7 @@ export function PostMatch() {
   const [isSpecialEvent, setIsSpecialEvent] = useState(false)
   const [playerInputs, setPlayerInputs] = useState<Record<string, PlayerMatchInput>>({})
   const [saved, setSaved] = useState(false)
+  const [motmPlayerId, setMotmPlayerId] = useState<string>("")
 
   const allPlayers = [...whiteTeam, ...blackTeam]
   const hasTeams = allPlayers.length > 0
@@ -52,7 +54,7 @@ export function PostMatch() {
       matchRating: getPlayerInput(playerId).rating,
     }))
 
-    saveMatch(whiteScore, blackScore, stats, isSpecialEvent)
+    saveMatch(whiteScore, blackScore, stats, isSpecialEvent, motmPlayerId || undefined)
     setSaved(true)
     
     // Reset form
@@ -61,6 +63,7 @@ export function PostMatch() {
       setBlackScore(0)
       setPlayerInputs({})
       setIsSpecialEvent(false)
+      setMotmPlayerId("")
       setSaved(false)
     }, 2000)
   }
@@ -269,6 +272,59 @@ export function PostMatch() {
               Superclásico / Evento Especial
             </Label>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* MOTM Selector */}
+      <Card className="border-amber-500/30 bg-gradient-to-br from-amber-500/10 to-transparent">
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-2">
+            <div className="rounded-lg bg-amber-500/20 p-2">
+              <Award className="h-5 w-5 text-amber-400" />
+            </div>
+            <div>
+              <CardTitle className="text-lg">Jugador del Partido</CardTitle>
+              <CardDescription className="text-xs">
+                Seleccioná al MOTM (Man of the Match)
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <Select value={motmPlayerId} onValueChange={setMotmPlayerId}>
+            <SelectTrigger className="w-full border-amber-500/30 bg-secondary/50">
+              <SelectValue placeholder="Seleccionar jugador destacado..." />
+            </SelectTrigger>
+            <SelectContent>
+              {allPlayers.map((playerId) => {
+                const player = getPlayerById(playerId)
+                if (!player) return null
+                const isWhiteTeam = whiteTeam.includes(playerId)
+                return (
+                  <SelectItem key={playerId} value={playerId}>
+                    <div className="flex items-center gap-2">
+                      <div className={cn(
+                        "h-2.5 w-2.5 rounded-full",
+                        isWhiteTeam ? "bg-white shadow" : "bg-zinc-800 ring-1 ring-zinc-500"
+                      )} />
+                      <span>{player.name}</span>
+                      <span className="text-muted-foreground">
+                        ({player.dynamicRating.toFixed(1)})
+                      </span>
+                    </div>
+                  </SelectItem>
+                )
+              })}
+            </SelectContent>
+          </Select>
+          {motmPlayerId && (
+            <div className="mt-3 flex items-center justify-center gap-2 text-sm">
+              <Award className="h-4 w-4 text-amber-400" />
+              <span className="text-amber-200">
+                {getPlayerById(motmPlayerId)?.name} será el MOTM de este partido
+              </span>
+            </div>
+          )}
         </CardContent>
       </Card>
 

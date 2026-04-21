@@ -5,6 +5,7 @@ export interface Player {
   totalGoals: number
   totalMatches: number
   ratingsHistory: number[]
+  motmCount: number // Man of the Match count
 }
 
 export interface MatchStats {
@@ -23,6 +24,7 @@ export interface Match {
   blackTeam: string[]
   stats: MatchStats[]
   isSpecialEvent: boolean
+  motmPlayerId?: string // Man of the Match
 }
 
 export interface Season {
@@ -38,6 +40,10 @@ export interface Season {
   bestRating?: {
     playerId: string
     rating: number
+  }
+  topMotm?: {
+    playerId: string
+    count: number
   }
 }
 

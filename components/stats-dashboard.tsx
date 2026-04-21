@@ -25,7 +25,8 @@ import {
   Lock,
   Plus,
   History,
-  TrendingUp
+  TrendingUp,
+  Award
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -47,7 +48,7 @@ export function StatsDashboard() {
   const [newSeasonDialog, setNewSeasonDialog] = useState(false)
 
   const currentSeason = getCurrentSeason()
-  const { topScorers, matchHistory } = getSeasonStats()
+  const { topScorers, matchHistory, topMotms } = getSeasonStats()
 
   const handleCloseSeason = () => {
     closeSeason()
@@ -105,6 +106,15 @@ export function StatsDashboard() {
                         <p className="font-bold flex items-center gap-2">
                           <Medal className="h-4 w-4 text-yellow-500" />
                           {topScorers[0]?.player.name} ({topScorers[0]?.goals} goles)
+                        </p>
+                      </div>
+                    )}
+                    {topMotms.length > 0 && (
+                      <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 p-3">
+                        <p className="text-sm text-muted-foreground mb-1">Mejor Jugador (MOTM)</p>
+                        <p className="font-bold flex items-center gap-2">
+                          <Award className="h-4 w-4 text-amber-400" />
+                          {topMotms[0]?.player.name} ({topMotms[0]?.count} MOTM)
                         </p>
                       </div>
                     )}
@@ -197,6 +207,67 @@ export function StatsDashboard() {
           ) : (
             <p className="text-center text-sm text-muted-foreground py-4">
               No hay goles registrados en esta temporada
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* MOTM Ranking */}
+      <Card className="border-amber-500/30 bg-gradient-to-br from-amber-500/5 to-transparent backdrop-blur">
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-2">
+            <Award className="h-5 w-5 text-amber-400" />
+            <CardTitle className="text-base">Top 5 - Jugadores del Partido</CardTitle>
+          </div>
+          <CardDescription className="text-xs">
+            MOTM de la temporada actual
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {topMotms.length > 0 ? (
+            <div className="space-y-2">
+              {topMotms.slice(0, 5).map((entry, index) => (
+                <div
+                  key={entry.player.id}
+                  className={cn(
+                    "flex items-center justify-between rounded-lg px-3 py-2",
+                    index === 0 ? "bg-amber-500/20 border border-amber-500/30" :
+                    "bg-secondary/30"
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className={cn(
+                      "flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold",
+                      index === 0 ? "bg-amber-500 text-amber-950" :
+                      "bg-secondary text-muted-foreground"
+                    )}>
+                      {index + 1}
+                    </span>
+                    <div>
+                      <span className="font-medium">{entry.player.name}</span>
+                      {index === 0 && (
+                        <p className="text-xs text-amber-400">Mejor Jugador</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Award className={cn(
+                      "h-4 w-4",
+                      index === 0 ? "text-amber-400" : "text-muted-foreground"
+                    )} />
+                    <Badge variant="outline" className={cn(
+                      "font-bold",
+                      index === 0 && "border-amber-500/50 text-amber-400"
+                    )}>
+                      {entry.count} MOTM
+                    </Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-center text-sm text-muted-foreground py-4">
+              No hay MOTM registrados en esta temporada
             </p>
           )}
         </CardContent>
@@ -333,12 +404,20 @@ export function StatsDashboard() {
                         Cerrada
                       </Badge>
                     </div>
-                    {season.topScorer && (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Medal className="h-4 w-4 text-yellow-500" />
-                        Goleador: {getPlayerById(season.topScorer.playerId)?.name} ({season.topScorer.goals})
-                      </div>
-                    )}
+                    <div className="space-y-1">
+                      {season.topScorer && (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Medal className="h-4 w-4 text-yellow-500" />
+                          Goleador: {getPlayerById(season.topScorer.playerId)?.name} ({season.topScorer.goals})
+                        </div>
+                      )}
+                      {season.topMotm && (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Award className="h-4 w-4 text-amber-400" />
+                          MOTM: {getPlayerById(season.topMotm.playerId)?.name} ({season.topMotm.count})
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ))}
             </div>

@@ -5,8 +5,9 @@ import { useStore } from "@/lib/store"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Shuffle, Copy, Check, Star, RefreshCw, Users } from "lucide-react"
+import { Shuffle, Copy, Check, Star, RefreshCw, Users, Image } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { TeamShareCard } from "./team-share-card"
 
 export function Matchmaker() {
   const [copied, setCopied] = useState(false)
@@ -219,7 +220,27 @@ ${blackNames.map((name, i) => `${i + 1}. ${name}`).join('\n')}
             </CardContent>
           </Card>
 
-          {/* Copy Button */}
+          {/* Visual Share Card for WhatsApp */}
+          <Card className="border-cyan-500/30 bg-card/50">
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2">
+                <div className="rounded-lg bg-cyan-500/20 p-2">
+                  <Image className="h-5 w-5 text-cyan-400" />
+                </div>
+                <div>
+                  <CardTitle className="text-lg">Imagen para Compartir</CardTitle>
+                  <CardDescription className="text-xs">
+                    Descargá o copiá la imagen para WhatsApp
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <TeamShareCard />
+            </CardContent>
+          </Card>
+
+          {/* Copy Text Button */}
           <Button 
             onClick={copyToClipboard} 
             variant="outline" 
@@ -233,7 +254,7 @@ ${blackNames.map((name, i) => `${i + 1}. ${name}`).join('\n')}
             ) : (
               <>
                 <Copy className="h-4 w-4" />
-                Copiar para WhatsApp
+                Copiar Texto para WhatsApp
               </>
             )}
           </Button>
