@@ -1,7 +1,8 @@
 "use client"
 
 import { cn } from "@/lib/utils"
-import { Users, Shuffle, Trophy, BarChart3, Sparkles } from "lucide-react"
+import { Users, Shuffle, Trophy, BarChart3, Sparkles, Settings } from "lucide-react"
+import { useAuth } from "@/lib/auth-context"
 
 interface NavigationProps {
   activeTab: string
@@ -15,11 +16,16 @@ const tabs = [
   { id: "stats", label: "Stats", icon: BarChart3 },
 ]
 
+const adminTab = { id: "admin", label: "Admin", icon: Settings }
+
 export function Navigation({ activeTab, onTabChange }: NavigationProps) {
+  const { isAdmin } = useAuth()
+  const allTabs = isAdmin ? [...tabs, adminTab] : tabs
+  
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-card/95 backdrop-blur-lg">
       <div className="mx-auto flex max-w-lg items-center justify-around px-2 py-2">
-        {tabs.map((tab) => {
+        {allTabs.map((tab) => {
           const Icon = tab.icon
           const isActive = activeTab === tab.id
           return (

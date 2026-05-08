@@ -1,23 +1,24 @@
 "use client"
 
 import { useRef, useState } from "react"
-import { useStore } from "@/lib/store"
+import type { Player } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Download, Share2, Check } from "lucide-react"
 import { toPng } from "html-to-image"
 import { cn } from "@/lib/utils"
 
-export function TeamShareCard() {
+interface TeamShareCardProps {
+  whiteTeam: Player[]
+  blackTeam: Player[]
+}
+
+export function TeamShareCard({ whiteTeam, blackTeam }: TeamShareCardProps) {
   const cardRef = useRef<HTMLDivElement>(null)
   const [downloading, setDownloading] = useState(false)
   const [copied, setCopied] = useState(false)
-  const { whiteTeam, blackTeam, getPlayerById } = useStore()
 
-  const getTeamTotal = (teamIds: string[]) => {
-    return teamIds.reduce((sum, id) => {
-      const player = getPlayerById(id)
-      return sum + (player?.dynamicRating || 0)
-    }, 0)
+  const getTeamTotal = (team: Player[]) => {
+    return team.reduce((sum, p) => sum + p.dynamic_rating, 0)
   }
 
   const getRatingColor = (rating: number) => {
@@ -116,28 +117,24 @@ export function TeamShareCard() {
               <span className="text-sm font-bold text-white">BLANCO</span>
             </div>
             <div className="space-y-1.5">
-              {whiteTeam.map((playerId) => {
-                const player = getPlayerById(playerId)
-                if (!player) return null
-                return (
+              {whiteTeam.map((player) => (
+                <div
+                  key={player.id}
+                  className="flex items-center justify-between rounded-md bg-white/10 px-2 py-1.5"
+                >
+                  <span className="truncate text-xs font-medium text-white/90">
+                    {player.name}
+                  </span>
                   <div
-                    key={playerId}
-                    className="flex items-center justify-between rounded-md bg-white/10 px-2 py-1.5"
+                    className={cn(
+                      "flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br text-[10px] font-bold text-white shadow-lg",
+                      getRatingColor(player.dynamic_rating)
+                    )}
                   >
-                    <span className="truncate text-xs font-medium text-white/90">
-                      {player.name}
-                    </span>
-                    <div
-                      className={cn(
-                        "flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br text-[10px] font-bold text-white shadow-lg",
-                        getRatingColor(player.dynamicRating)
-                      )}
-                    >
-                      {player.dynamicRating.toFixed(0)}
-                    </div>
+                    {player.dynamic_rating.toFixed(0)}
                   </div>
-                )
-              })}
+                </div>
+              ))}
             </div>
             <div className="mt-2 border-t border-white/10 pt-2 text-center">
               <span className="text-xs text-white/60">Total: </span>
@@ -154,28 +151,24 @@ export function TeamShareCard() {
               <span className="text-sm font-bold text-zinc-300">NEGRO</span>
             </div>
             <div className="space-y-1.5">
-              {blackTeam.map((playerId) => {
-                const player = getPlayerById(playerId)
-                if (!player) return null
-                return (
+              {blackTeam.map((player) => (
+                <div
+                  key={player.id}
+                  className="flex items-center justify-between rounded-md bg-zinc-800/50 px-2 py-1.5"
+                >
+                  <span className="truncate text-xs font-medium text-zinc-300">
+                    {player.name}
+                  </span>
                   <div
-                    key={playerId}
-                    className="flex items-center justify-between rounded-md bg-zinc-800/50 px-2 py-1.5"
+                    className={cn(
+                      "flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br text-[10px] font-bold text-white shadow-lg",
+                      getRatingColor(player.dynamic_rating)
+                    )}
                   >
-                    <span className="truncate text-xs font-medium text-zinc-300">
-                      {player.name}
-                    </span>
-                    <div
-                      className={cn(
-                        "flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br text-[10px] font-bold text-white shadow-lg",
-                        getRatingColor(player.dynamicRating)
-                      )}
-                    >
-                      {player.dynamicRating.toFixed(0)}
-                    </div>
+                    {player.dynamic_rating.toFixed(0)}
                   </div>
-                )
-              })}
+                </div>
+              ))}
             </div>
             <div className="mt-2 border-t border-zinc-700/50 pt-2 text-center">
               <span className="text-xs text-zinc-500">Total: </span>

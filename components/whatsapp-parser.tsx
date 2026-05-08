@@ -1,12 +1,22 @@
 "use client"
 
-import { useState } from "react"
-import { useStore } from "@/lib/store"
+import { useState, useEffect, useCallback } from "react"
+import { 
+  getPlayers, 
+  parsePlayersFromText, 
+  createPlayer, 
+  addAlias,
+  getCurrentMatchSetup,
+  setConfirmedPlayers as dbSetConfirmedPlayers,
+  getPlayerById
+} from "@/lib/db"
+import type { Player, ParsedPlayer } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { Slider } from "@/components/ui/slider"
 import { 
   Dialog, 
   DialogContent, 
@@ -15,116 +25,165 @@ import {
   DialogTitle,
   DialogFooter 
 } from "@/components/ui/dialog"
-import { ClipboardPaste, Users, UserPlus, Check, Star, Trash2 } from "lucide-react"
+import { ClipboardPaste, Users, UserPlus, Check, Star, Trash2, Tag, Loader2, RefreshCw } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-export function WhatsAppParser() {
+interface WhatsAppParserProps {
+  onPlayersConfirmed?: (playerIds: string[]) => void
+}
+
+export function WhatsAppParser({ onPlayersConfirmed }: WhatsAppParserProps) {
   const [rawText, setRawText] = useState("")
-  const [parsedNames, setParsedNames] = useState<string[]>([])
-  const [newPlayerDialog, setNewPlayerDialog] = useState(false)
-  const [pendingNewPlayers, setPendingNewPlayers] = useState<{ name: string; rating: number }[]>([])
-  const [currentNewPlayer, setCurrentNewPlayer] = useState({ name: "", rating: 5 })
+  const [parsedPlayers, setParsedPlayers] = useState<ParsedPlayer[]>([])
+  const [confirmedPlayerIds, setConfirmedPlayerIds] = useState<string[]>([])
+  const [confirmedPlayers, setConfirmedPlayers] = useState<Player[]>([])
+  const [processing, setProcessing] = useState(false)
+  const [loading, setLoading] = useState(true)
   
-  const { players, addPlayer, confirmedPlayers, setConfirmedPlayers, getPlayerByName } = useStore()
+  // New player dialog state
+  const [newPlayerDialog, setNewPlayerDialog] = useState(false)
+  const [pendingNewPlayers, setPendingNewPlayers] = useState<ParsedPlayer[]>([])
+  const [currentNewPlayer, setCurrentNewPlayer] = useState<{ name: string; rating: number; createAlias: boolean; originalName: string }>({ 
+    name: "", 
+    rating: 5, 
+    createAlias: false,
+    originalName: ""
+  })
 
-  const parseWhatsAppList = () => {
-    // Parse formats like: "1 Messi, 2 Ronaldo..." or "1. Messi 2. Ronaldo" or just "Messi, Ronaldo"
-    const text = rawText.trim()
-    
-    // Remove common prefixes and split
-    const cleaned = text
-      .replace(/[📌🔵⚪️⚫️✅❌]/g, "") // Remove emojis
-      .replace(/\n/g, ", ") // Replace newlines with commas
-    
-    // Try to extract names
-    const names: string[] = []
-    const patterns = [
-      /\d+[\.\)\s]+([A-Za-zÀ-ÿ\s]+)/g, // "1. Name" or "1) Name" or "1 Name"
-      /([A-Za-zÀ-ÿ]+(?:\s[A-Za-zÀ-ÿ]+)?)/g, // Just names
-    ]
-    
-    // First try numbered format
-    let matches = [...cleaned.matchAll(patterns[0])]
-    if (matches.length > 0) {
-      matches.forEach(match => {
-        const name = match[1].trim()
-        if (name && name.length > 1) {
-          names.push(name)
-        }
-      })
-    } else {
-      // Fall back to comma/space separated
-      cleaned.split(/[,;]+/).forEach(part => {
-        const name = part.replace(/^\d+[\.\)\s]*/g, "").trim()
-        if (name && name.length > 1 && !/^\d+$/.test(name)) {
-          names.push(name)
-        }
-      })
-    }
-
-    // Limit to 16 players
-    const uniqueNames = [...new Set(names)].slice(0, 16)
-    setParsedNames(uniqueNames)
-
-    // Check for new players
-    const newPlayers: { name: string; rating: number }[] = []
-    const existingPlayerIds: string[] = []
-
-    uniqueNames.forEach(name => {
-      const existingPlayer = getPlayerByName(name)
-      if (existingPlayer) {
-        existingPlayerIds.push(existingPlayer.id)
-      } else {
-        newPlayers.push({ name, rating: 5 })
+  // Load existing match setup
+  const loadMatchSetup = useCallback(async () => {
+    setLoading(true)
+    try {
+      const setup = await getCurrentMatchSetup()
+      if (setup && setup.confirmed_players.length > 0) {
+        setConfirmedPlayerIds(setup.confirmed_players)
+        // Load player details
+        const playerDetails = await Promise.all(
+          setup.confirmed_players.map(id => getPlayerById(id))
+        )
+        setConfirmedPlayers(playerDetails.filter((p): p is Player => p !== null))
       }
-    })
-
-    if (newPlayers.length > 0) {
-      setPendingNewPlayers(newPlayers)
-      setCurrentNewPlayer(newPlayers[0])
-      setNewPlayerDialog(true)
-    } else {
-      setConfirmedPlayers(existingPlayerIds)
+    } catch (error) {
+      console.error('Failed to load match setup:', error)
+    } finally {
+      setLoading(false)
     }
-  }
+  }, [])
 
-  const handleNewPlayerRating = () => {
-    // Add the current new player
-    const addedPlayer = addPlayer(currentNewPlayer.name, currentNewPlayer.rating)
+  useEffect(() => {
+    loadMatchSetup()
+  }, [loadMatchSetup])
+
+  const parseWhatsAppList = async () => {
+    if (!rawText.trim()) return
     
-    // Update pending list
-    const remaining = pendingNewPlayers.filter(p => p.name !== currentNewPlayer.name)
-    setPendingNewPlayers(remaining)
-
-    if (remaining.length > 0) {
-      setCurrentNewPlayer(remaining[0])
-    } else {
-      setNewPlayerDialog(false)
-      // Now set all confirmed players
-      const allPlayerIds = parsedNames
-        .map(name => {
-          const player = getPlayerByName(name)
-          return player?.id
-        })
+    setProcessing(true)
+    try {
+      const parsed = await parsePlayersFromText(rawText)
+      setParsedPlayers(parsed)
+      
+      // Separate existing and new players
+      const existing = parsed.filter(p => !p.isNew)
+      const newPlayers = parsed.filter(p => p.isNew)
+      
+      // Automatically confirm existing players
+      const existingIds = existing
+        .map(p => p.existingPlayer?.id)
         .filter((id): id is string => id !== undefined)
       
-      // Add the just-added player
-      if (!allPlayerIds.includes(addedPlayer.id)) {
-        allPlayerIds.push(addedPlayer.id)
+      if (newPlayers.length > 0) {
+        setPendingNewPlayers(newPlayers)
+        setCurrentNewPlayer({
+          name: newPlayers[0].name,
+          rating: 5,
+          createAlias: false,
+          originalName: newPlayers[0].name
+        })
+        setNewPlayerDialog(true)
+      } else {
+        // All players exist, just confirm them
+        await dbSetConfirmedPlayers(existingIds)
+        setConfirmedPlayerIds(existingIds)
+        const playerDetails = await Promise.all(existingIds.map(id => getPlayerById(id)))
+        setConfirmedPlayers(playerDetails.filter((p): p is Player => p !== null))
+        onPlayersConfirmed?.(existingIds)
       }
-      
-      setConfirmedPlayers(allPlayerIds)
+    } catch (error) {
+      console.error('Failed to parse players:', error)
+    } finally {
+      setProcessing(false)
     }
   }
 
-  const removeConfirmedPlayer = (playerId: string) => {
-    setConfirmedPlayers(confirmedPlayers.filter(id => id !== playerId))
+  const handleNewPlayerRating = async () => {
+    try {
+      // Create the new player
+      const newPlayer = await createPlayer(currentNewPlayer.name, currentNewPlayer.rating)
+      
+      // Optionally create alias if name was changed
+      if (currentNewPlayer.createAlias && currentNewPlayer.originalName !== currentNewPlayer.name) {
+        await addAlias(newPlayer.id, currentNewPlayer.originalName)
+      }
+      
+      // Move to next pending player or finish
+      const remaining = pendingNewPlayers.slice(1)
+      setPendingNewPlayers(remaining)
+      
+      if (remaining.length > 0) {
+        setCurrentNewPlayer({
+          name: remaining[0].name,
+          rating: 5,
+          createAlias: false,
+          originalName: remaining[0].name
+        })
+      } else {
+        setNewPlayerDialog(false)
+        
+        // Now get all player IDs and confirm
+        const allPlayers = await getPlayers()
+        const confirmedIds = parsedPlayers
+          .map(p => {
+            if (p.existingPlayer) return p.existingPlayer.id
+            return allPlayers.find(ap => ap.name.toLowerCase() === p.name.toLowerCase())?.id
+          })
+          .filter((id): id is string => id !== undefined)
+        
+        await dbSetConfirmedPlayers(confirmedIds)
+        setConfirmedPlayerIds(confirmedIds)
+        const playerDetails = await Promise.all(confirmedIds.map(id => getPlayerById(id)))
+        setConfirmedPlayers(playerDetails.filter((p): p is Player => p !== null))
+        onPlayersConfirmed?.(confirmedIds)
+      }
+    } catch (error) {
+      console.error('Failed to create player:', error)
+    }
   }
 
-  const getConfirmedPlayerObjects = () => {
-    return confirmedPlayers
-      .map(id => players.find(p => p.id === id))
-      .filter((p): p is typeof players[0] => p !== undefined)
+  const removeConfirmedPlayer = async (playerId: string) => {
+    const newIds = confirmedPlayerIds.filter(id => id !== playerId)
+    setConfirmedPlayerIds(newIds)
+    setConfirmedPlayers(prev => prev.filter(p => p.id !== playerId))
+    await dbSetConfirmedPlayers(newIds)
+    onPlayersConfirmed?.(newIds)
+  }
+
+  const clearAll = async () => {
+    setConfirmedPlayerIds([])
+    setConfirmedPlayers([])
+    setRawText("")
+    setParsedPlayers([])
+    await dbSetConfirmedPlayers([])
+    onPlayersConfirmed?.([])
+  }
+
+  if (loading) {
+    return (
+      <Card className="border-border/50 bg-card/50">
+        <CardContent className="flex items-center justify-center py-8">
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        </CardContent>
+      </Card>
+    )
   }
 
   return (
@@ -138,7 +197,7 @@ export function WhatsAppParser() {
             <div>
               <CardTitle className="text-lg">Parser de WhatsApp</CardTitle>
               <CardDescription className="text-xs">
-                Pegá la lista de confirmados del grupo
+                Pega la lista de confirmados del grupo. Reconoce alias automaticamente.
               </CardDescription>
             </div>
           </div>
@@ -153,10 +212,19 @@ export function WhatsAppParser() {
           <Button 
             onClick={parseWhatsAppList}
             className="w-full gap-2"
-            disabled={!rawText.trim()}
+            disabled={!rawText.trim() || processing}
           >
-            <Users className="h-4 w-4" />
-            Procesar Lista ({rawText.split(/[\n,]/).filter(x => x.trim()).length} nombres)
+            {processing ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Procesando...
+              </>
+            ) : (
+              <>
+                <Users className="h-4 w-4" />
+                Procesar Lista ({rawText.split(/[\n,]/).filter(x => x.trim()).length} nombres)
+              </>
+            )}
           </Button>
         </CardContent>
       </Card>
@@ -170,14 +238,19 @@ export function WhatsAppParser() {
                 <Check className="h-5 w-5 text-primary" />
                 Confirmados
               </CardTitle>
-              <Badge variant="secondary" className="bg-primary/20 text-primary">
-                {confirmedPlayers.length}/16
-              </Badge>
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary" className="bg-primary/20 text-primary">
+                  {confirmedPlayers.length}/16
+                </Badge>
+                <Button variant="ghost" size="icon" onClick={clearAll}>
+                  <RefreshCw className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 gap-2">
-              {getConfirmedPlayerObjects().map((player, index) => (
+              {confirmedPlayers.map((player, index) => (
                 <div
                   key={player.id}
                   className="group flex items-center justify-between rounded-lg bg-secondary/50 p-3 transition-all hover:bg-secondary"
@@ -191,7 +264,7 @@ export function WhatsAppParser() {
                   <div className="flex items-center gap-2">
                     <div className="flex items-center gap-1 text-sm text-muted-foreground">
                       <Star className="h-3 w-3 fill-primary text-primary" />
-                      {player.dynamicRating.toFixed(1)}
+                      {player.dynamic_rating.toFixed(1)}
                     </div>
                     <button
                       onClick={() => removeConfirmedPlayer(player.id)}
@@ -221,37 +294,49 @@ export function WhatsAppParser() {
               Nuevo Jugador Detectado
             </DialogTitle>
             <DialogDescription>
-              Asigná un puntaje inicial del 1 al 10 para {currentNewPlayer.name}
+              No se encontro &quot;{currentNewPlayer.originalName}&quot; en la base de datos.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="flex items-center justify-between rounded-lg bg-secondary/50 p-4">
-              <span className="font-semibold text-lg">{currentNewPlayer.name}</span>
+              <span className="font-semibold text-lg">{currentNewPlayer.originalName}</span>
               <Badge variant="outline">
                 {pendingNewPlayers.length} pendiente{pendingNewPlayers.length !== 1 && "s"}
               </Badge>
             </div>
+            
+            {/* Name input (allows correction) */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">Puntaje Inicial</label>
-              <div className="flex items-center gap-3">
-                <Input
-                  type="range"
-                  min="1"
-                  max="10"
-                  step="0.5"
-                  value={currentNewPlayer.rating}
-                  onChange={(e) => setCurrentNewPlayer(prev => ({ ...prev, rating: parseFloat(e.target.value) }))}
-                  className="flex-1"
-                />
-                <div className={cn(
-                  "flex h-12 w-12 items-center justify-center rounded-lg font-bold text-xl",
-                  currentNewPlayer.rating >= 8 ? "bg-primary/20 text-primary" :
-                  currentNewPlayer.rating >= 5 ? "bg-yellow-500/20 text-yellow-500" :
-                  "bg-destructive/20 text-destructive"
-                )}>
-                  {currentNewPlayer.rating}
+              <label className="text-sm font-medium">Nombre a Guardar</label>
+              <Input
+                value={currentNewPlayer.name}
+                onChange={(e) => {
+                  const newName = e.target.value
+                  setCurrentNewPlayer(prev => ({ 
+                    ...prev, 
+                    name: newName,
+                    createAlias: newName !== prev.originalName
+                  }))
+                }}
+                placeholder="Nombre completo..."
+              />
+              {currentNewPlayer.name !== currentNewPlayer.originalName && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Tag className="h-3 w-3" />
+                  Se creara alias: &quot;{currentNewPlayer.originalName}&quot; → &quot;{currentNewPlayer.name}&quot;
                 </div>
-              </div>
+              )}
+            </div>
+            
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Puntaje Inicial: {currentNewPlayer.rating}</label>
+              <Slider
+                value={[currentNewPlayer.rating]}
+                onValueChange={([v]) => setCurrentNewPlayer(prev => ({ ...prev, rating: v }))}
+                min={1}
+                max={10}
+                step={0.5}
+              />
               <div className="flex justify-between text-xs text-muted-foreground">
                 <span>Principiante</span>
                 <span>Intermedio</span>

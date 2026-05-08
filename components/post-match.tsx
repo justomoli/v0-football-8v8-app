@@ -1,16 +1,23 @@
 "use client"
 
-import { useState } from "react"
-import { useStore } from "@/lib/store"
-import type { MatchStats } from "@/lib/types"
+import { useState, useEffect, useCallback } from "react"
+import { 
+  getCurrentMatchSetup, 
+  getPlayerById,
+  getActiveSeason,
+  saveMatchWithStats,
+  createSeason
+} from "@/lib/db"
+import type { Player, Season, CurrentMatchSetup } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
+import { Slider } from "@/components/ui/slider"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Trophy, Target, Star, Save, Sparkles, AlertCircle, Award } from "lucide-react"
+import { Trophy, Target, Star, Save, Sparkles, AlertCircle, Award, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface PlayerMatchInput {
@@ -20,7 +27,12 @@ interface PlayerMatchInput {
 }
 
 export function PostMatch() {
-  const { whiteTeam, blackTeam, getPlayerById, saveMatch, getCurrentSeason } = useStore()
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [setup, setSetup] = useState<CurrentMatchSetup | null>(null)
+  const [whiteTeamPlayers, setWhiteTeamPlayers] = useState<Player[]>([])
+  const [blackTeamPlayers, setBlackTeamPlayers] = useState<Player[]>([])
+  const [currentSeason, setCurrentSeason] = useState<Season | null>(null)
   
   const [whiteScore, setWhiteScore] = useState(0)
   const [blackScore, setBlackScore] = useState(0)
@@ -29,9 +41,48 @@ export function PostMatch() {
   const [saved, setSaved] = useState(false)
   const [motmPlayerId, setMotmPlayerId] = useState<string>("")
 
-  const allPlayers = [...whiteTeam, ...blackTeam]
+  const loadData = useCallback(async () => {
+    setLoading(true)
+    try {
+      const [matchSetup, season] = await Promise.all([
+        getCurrentMatchSetup(),
+        getActiveSeason()
+      ])
+      
+      setSetup(matchSetup)
+      
+      // Create season if none exists
+      if (!season) {
+        const newSeason = await createSeason('Temporada 1')
+        setCurrentSeason(newSeason)
+      } else {
+        setCurrentSeason(season)
+      }
+      
+      if (matchSetup) {
+        const whiteDetails = await Promise.all(
+          matchSetup.white_team.map(id => getPlayerById(id))
+        )
+        setWhiteTeamPlayers(whiteDetails.filter((p): p is Player => p !== null))
+        
+        const blackDetails = await Promise.all(
+          matchSetup.black_team.map(id => getPlayerById(id))
+        )
+        setBlackTeamPlayers(blackDetails.filter((p): p is Player => p !== null))
+      }
+    } catch (error) {
+      console.error('Failed to load data:', error)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
+
+  const allPlayers = [...whiteTeamPlayers, ...blackTeamPlayers]
   const hasTeams = allPlayers.length > 0
-  const currentSeason = getCurrentSeason()
 
   const getPlayerInput = (playerId: string): PlayerMatchInput => {
     return playerInputs[playerId] || { playerId, goals: 0, rating: 7 }
@@ -47,41 +98,57 @@ export function PostMatch() {
     }))
   }
 
-  const handleSaveMatch = () => {
-    const stats: MatchStats[] = allPlayers.map(playerId => ({
-      playerId,
-      goalsScored: getPlayerInput(playerId).goals,
-      matchRating: getPlayerInput(playerId).rating,
-    }))
-
-    saveMatch(whiteScore, blackScore, stats, isSpecialEvent, motmPlayerId || undefined)
-    setSaved(true)
+  const handleSaveMatch = async () => {
+    if (!currentSeason) return
     
-    // Reset form
-    setTimeout(() => {
-      setWhiteScore(0)
-      setBlackScore(0)
-      setPlayerInputs({})
-      setIsSpecialEvent(false)
-      setMotmPlayerId("")
-      setSaved(false)
-    }, 2000)
+    setSaving(true)
+    try {
+      const stats = allPlayers.map(player => ({
+        playerId: player.id,
+        goals: getPlayerInput(player.id).goals,
+        rating: getPlayerInput(player.id).rating,
+      }))
+
+      await saveMatchWithStats(
+        currentSeason.id,
+        whiteScore,
+        blackScore,
+        whiteTeamPlayers.map(p => p.id),
+        blackTeamPlayers.map(p => p.id),
+        stats,
+        isSpecialEvent,
+        motmPlayerId || undefined
+      )
+      
+      setSaved(true)
+      
+      // Reset form
+      setTimeout(() => {
+        setWhiteScore(0)
+        setBlackScore(0)
+        setPlayerInputs({})
+        setIsSpecialEvent(false)
+        setMotmPlayerId("")
+        setSaved(false)
+      }, 2000)
+    } catch (error) {
+      console.error('Failed to save match:', error)
+    } finally {
+      setSaving(false)
+    }
   }
 
   // Calculate total goals to validate
-  const totalInputGoals = allPlayers.reduce((sum, id) => sum + getPlayerInput(id).goals, 0)
+  const totalInputGoals = allPlayers.reduce((sum, p) => sum + getPlayerInput(p.id).goals, 0)
   const totalMatchGoals = whiteScore + blackScore
   const goalsMatch = totalInputGoals === totalMatchGoals
 
-  const renderPlayerRow = (playerId: string, team: 'white' | 'black') => {
-    const player = getPlayerById(playerId)
-    if (!player) return null
-
-    const input = getPlayerInput(playerId)
+  const renderPlayerRow = (player: Player, team: 'white' | 'black') => {
+    const input = getPlayerInput(player.id)
 
     return (
       <div
-        key={playerId}
+        key={player.id}
         className={cn(
           "rounded-lg p-3 transition-all",
           team === 'white' ? "bg-white/10" : "bg-zinc-800/50"
@@ -90,7 +157,7 @@ export function PostMatch() {
         <div className="flex items-center justify-between mb-2">
           <span className="font-medium">{player.name}</span>
           <Badge variant="outline" className="text-xs">
-            Actual: {player.dynamicRating.toFixed(1)}
+            Actual: {player.dynamic_rating.toFixed(1)}
           </Badge>
         </div>
         <div className="grid grid-cols-2 gap-3">
@@ -104,7 +171,7 @@ export function PostMatch() {
                 size="sm"
                 variant="outline"
                 className="h-8 w-8 p-0"
-                onClick={() => updatePlayerInput(playerId, 'goals', Math.max(0, input.goals - 1))}
+                onClick={() => updatePlayerInput(player.id, 'goals', Math.max(0, input.goals - 1))}
               >
                 -
               </Button>
@@ -113,14 +180,14 @@ export function PostMatch() {
                 min="0"
                 max="20"
                 value={input.goals}
-                onChange={(e) => updatePlayerInput(playerId, 'goals', parseInt(e.target.value) || 0)}
+                onChange={(e) => updatePlayerInput(player.id, 'goals', parseInt(e.target.value) || 0)}
                 className="h-8 w-12 text-center px-1"
               />
               <Button
                 size="sm"
                 variant="outline"
                 className="h-8 w-8 p-0"
-                onClick={() => updatePlayerInput(playerId, 'goals', input.goals + 1)}
+                onClick={() => updatePlayerInput(player.id, 'goals', input.goals + 1)}
               >
                 +
               </Button>
@@ -130,30 +197,29 @@ export function PostMatch() {
           {/* Rating Input */}
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground flex items-center gap-1">
-              <Star className="h-3 w-3" /> Nota
+              <Star className="h-3 w-3" /> Nota: {input.rating}
             </Label>
-            <div className="flex items-center gap-2">
-              <Input
-                type="range"
-                min="1"
-                max="10"
-                step="0.5"
-                value={input.rating}
-                onChange={(e) => updatePlayerInput(playerId, 'rating', parseFloat(e.target.value))}
-                className="flex-1 h-8"
-              />
-              <span className={cn(
-                "w-8 text-center font-bold",
-                input.rating >= 8 ? "text-primary" :
-                input.rating >= 5 ? "text-yellow-500" :
-                "text-destructive"
-              )}>
-                {input.rating}
-              </span>
-            </div>
+            <Slider
+              value={[input.rating]}
+              onValueChange={([v]) => updatePlayerInput(player.id, 'rating', v)}
+              min={1}
+              max={10}
+              step={0.5}
+              className="py-2"
+            />
           </div>
         </div>
       </div>
+    )
+  }
+
+  if (loading) {
+    return (
+      <Card className="border-border/50 bg-card/50">
+        <CardContent className="flex items-center justify-center py-8">
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        </CardContent>
+      </Card>
     )
   }
 
@@ -162,9 +228,9 @@ export function PostMatch() {
       <Card className="border-primary/50 bg-primary/10">
         <CardContent className="py-12 text-center">
           <Sparkles className="h-12 w-12 mx-auto text-primary mb-4 animate-pulse" />
-          <h3 className="text-xl font-bold mb-2">¡Partido Guardado!</h3>
+          <h3 className="text-xl font-bold mb-2">Partido Guardado!</h3>
           <p className="text-muted-foreground">
-            Los puntajes dinámicos fueron actualizados
+            Los puntajes dinamicos fueron actualizados
           </p>
         </CardContent>
       </Card>
@@ -177,7 +243,7 @@ export function PostMatch() {
         <CardContent className="py-8 text-center">
           <AlertCircle className="h-8 w-8 mx-auto text-yellow-500 mb-3" />
           <p className="text-yellow-200">
-            Primero generá los equipos en la pestaña &quot;Equipos&quot;
+            Primero genera los equipos en la pestana &quot;Equipos&quot;
           </p>
         </CardContent>
       </Card>
@@ -269,7 +335,7 @@ export function PostMatch() {
               onCheckedChange={setIsSpecialEvent}
             />
             <Label htmlFor="special" className="text-sm cursor-pointer">
-              Superclásico / Evento Especial
+              Superclasico / Evento Especial
             </Label>
           </div>
         </CardContent>
@@ -285,7 +351,7 @@ export function PostMatch() {
             <div>
               <CardTitle className="text-lg">Jugador del Partido</CardTitle>
               <CardDescription className="text-xs">
-                Seleccioná al MOTM (Man of the Match)
+                Selecciona al MOTM (Man of the Match)
               </CardDescription>
             </div>
           </div>
@@ -296,12 +362,10 @@ export function PostMatch() {
               <SelectValue placeholder="Seleccionar jugador destacado..." />
             </SelectTrigger>
             <SelectContent>
-              {allPlayers.map((playerId) => {
-                const player = getPlayerById(playerId)
-                if (!player) return null
-                const isWhiteTeam = whiteTeam.includes(playerId)
+              {allPlayers.map((player) => {
+                const isWhiteTeam = whiteTeamPlayers.some(p => p.id === player.id)
                 return (
-                  <SelectItem key={playerId} value={playerId}>
+                  <SelectItem key={player.id} value={player.id}>
                     <div className="flex items-center gap-2">
                       <div className={cn(
                         "h-2.5 w-2.5 rounded-full",
@@ -309,7 +373,7 @@ export function PostMatch() {
                       )} />
                       <span>{player.name}</span>
                       <span className="text-muted-foreground">
-                        ({player.dynamicRating.toFixed(1)})
+                        ({player.dynamic_rating.toFixed(1)})
                       </span>
                     </div>
                   </SelectItem>
@@ -321,7 +385,7 @@ export function PostMatch() {
             <div className="mt-3 flex items-center justify-center gap-2 text-sm">
               <Award className="h-4 w-4 text-amber-400" />
               <span className="text-amber-200">
-                {getPlayerById(motmPlayerId)?.name} será el MOTM de este partido
+                {allPlayers.find(p => p.id === motmPlayerId)?.name} sera el MOTM de este partido
               </span>
             </div>
           )}
@@ -337,7 +401,7 @@ export function PostMatch() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
-          {whiteTeam.map(id => renderPlayerRow(id, 'white'))}
+          {whiteTeamPlayers.map(player => renderPlayerRow(player, 'white'))}
         </CardContent>
       </Card>
 
@@ -350,7 +414,7 @@ export function PostMatch() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
-          {blackTeam.map(id => renderPlayerRow(id, 'black'))}
+          {blackTeamPlayers.map(player => renderPlayerRow(player, 'black'))}
         </CardContent>
       </Card>
 
@@ -361,7 +425,7 @@ export function PostMatch() {
       )}>
         <CardContent className="py-4">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-sm">Validación de goles</span>
+            <span className="text-sm">Validacion de goles</span>
             <Badge variant={goalsMatch ? "default" : "destructive"}>
               {totalInputGoals} / {totalMatchGoals} goles
             </Badge>
@@ -373,11 +437,20 @@ export function PostMatch() {
           )}
           <Button 
             onClick={handleSaveMatch}
-            disabled={!goalsMatch || totalMatchGoals === 0}
+            disabled={!goalsMatch || totalMatchGoals === 0 || saving}
             className="w-full gap-2"
           >
-            <Save className="h-4 w-4" />
-            Guardar Partido
+            {saving ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Guardando...
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4" />
+                Guardar Partido
+              </>
+            )}
           </Button>
         </CardContent>
       </Card>

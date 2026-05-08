@@ -1,7 +1,18 @@
 "use client"
 
-import { useState } from "react"
-import { useStore } from "@/lib/store"
+import { useState, useEffect, useCallback } from "react"
+import { 
+  getPlayers,
+  getSeasons,
+  getMatches,
+  getActiveSeason,
+  getSeasonTopScorers,
+  getSeasonTopMotms,
+  closeSeason,
+  createSeason,
+  getPlayerById
+} from "@/lib/db"
+import type { Player, Season, Match } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -26,46 +37,106 @@ import {
   Plus,
   History,
   TrendingUp,
-  Award
+  Award,
+  Loader2,
+  RefreshCw
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useAuth } from "@/lib/auth-context"
 
 export function StatsDashboard() {
-  const { 
-    players, 
-    seasons, 
-    matches,
-    getCurrentSeason, 
-    getSeasonStats,
-    closeSeason,
-    startNewSeason,
-    currentSeasonId,
-    getPlayerById
-  } = useStore()
-
+  const { isAdmin } = useAuth()
+  const [loading, setLoading] = useState(true)
+  const [players, setPlayers] = useState<Player[]>([])
+  const [seasons, setSeasons] = useState<Season[]>([])
+  const [matches, setMatches] = useState<Match[]>([])
+  const [currentSeason, setCurrentSeason] = useState<Season | null>(null)
+  const [topScorers, setTopScorers] = useState<{ player: Player; goals: number }[]>([])
+  const [topMotms, setTopMotms] = useState<{ player: Player; count: number }[]>([])
+  
   const [newSeasonName, setNewSeasonName] = useState("")
   const [closeSeasonDialog, setCloseSeasonDialog] = useState(false)
   const [newSeasonDialog, setNewSeasonDialog] = useState(false)
 
-  const currentSeason = getCurrentSeason()
-  const { topScorers, matchHistory, topMotms } = getSeasonStats()
+  const loadData = useCallback(async () => {
+    setLoading(true)
+    try {
+      const [playersData, seasonsData, activeSeasonData] = await Promise.all([
+        getPlayers(),
+        getSeasons(),
+        getActiveSeason()
+      ])
+      
+      setPlayers(playersData)
+      setSeasons(seasonsData)
+      setCurrentSeason(activeSeasonData)
+      
+      if (activeSeasonData) {
+        const [matchesData, scorers, motms] = await Promise.all([
+          getMatches(activeSeasonData.id),
+          getSeasonTopScorers(activeSeasonData.id),
+          getSeasonTopMotms(activeSeasonData.id)
+        ])
+        setMatches(matchesData)
+        setTopScorers(scorers)
+        setTopMotms(motms)
+      }
+    } catch (error) {
+      console.error('Failed to load data:', error)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
 
-  const handleCloseSeason = () => {
-    closeSeason()
-    setCloseSeasonDialog(false)
-    setNewSeasonDialog(true)
+  useEffect(() => {
+    loadData()
+  }, [loadData])
+
+  const handleCloseSeason = async () => {
+    if (!currentSeason) return
+    
+    try {
+      await closeSeason(currentSeason.id, {
+        topScorerId: topScorers[0]?.player.id,
+        topScorerGoals: topScorers[0]?.goals,
+        bestRatingId: players.sort((a, b) => b.dynamic_rating - a.dynamic_rating)[0]?.id,
+        bestRatingValue: players.sort((a, b) => b.dynamic_rating - a.dynamic_rating)[0]?.dynamic_rating,
+        topMotmId: topMotms[0]?.player.id,
+        topMotmCount: topMotms[0]?.count
+      })
+      setCloseSeasonDialog(false)
+      setNewSeasonDialog(true)
+      await loadData()
+    } catch (error) {
+      console.error('Failed to close season:', error)
+    }
   }
 
-  const handleStartNewSeason = () => {
-    if (newSeasonName.trim()) {
-      startNewSeason(newSeasonName)
+  const handleStartNewSeason = async () => {
+    if (!newSeasonName.trim()) return
+    
+    try {
+      await createSeason(newSeasonName)
       setNewSeasonName("")
       setNewSeasonDialog(false)
+      await loadData()
+    } catch (error) {
+      console.error('Failed to start new season:', error)
     }
   }
 
   // Sort players by dynamic rating
-  const sortedByRating = [...players].sort((a, b) => b.dynamicRating - a.dynamicRating)
+  const sortedByRating = [...players].sort((a, b) => b.dynamic_rating - a.dynamic_rating)
+
+  if (loading) {
+    return (
+      <Card className="border-border/50 bg-card/50">
+        <CardContent className="flex items-center justify-center py-8">
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        </CardContent>
+      </Card>
+    )
+  }
 
   return (
     <div className="space-y-4">
@@ -80,86 +151,91 @@ export function StatsDashboard() {
               <div>
                 <h3 className="font-bold">{currentSeason?.name || 'Sin Temporada'}</h3>
                 <p className="text-xs text-muted-foreground">
-                  {matchHistory.length} partido{matchHistory.length !== 1 && 's'} jugado{matchHistory.length !== 1 && 's'}
+                  {matches.length} partido{matches.length !== 1 && 's'} jugado{matches.length !== 1 && 's'}
                 </p>
               </div>
             </div>
-            {currentSeason && (
-              <Dialog open={closeSeasonDialog} onOpenChange={setCloseSeasonDialog}>
-                <DialogTrigger asChild>
-                  <Button variant="outline" size="sm" className="gap-1">
-                    <Lock className="h-3 w-3" />
-                    Cerrar
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Cerrar Temporada</DialogTitle>
-                    <DialogDescription>
-                      ¿Estás seguro de cerrar {currentSeason.name}? Se guardará un registro histórico y se reiniciarán los goles de la temporada.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="py-4 space-y-3">
-                    {topScorers.length > 0 && (
-                      <div className="rounded-lg bg-secondary/50 p-3">
-                        <p className="text-sm text-muted-foreground mb-1">Goleador de la temporada</p>
-                        <p className="font-bold flex items-center gap-2">
-                          <Medal className="h-4 w-4 text-yellow-500" />
-                          {topScorers[0]?.player.name} ({topScorers[0]?.goals} goles)
-                        </p>
-                      </div>
-                    )}
-                    {topMotms.length > 0 && (
-                      <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 p-3">
-                        <p className="text-sm text-muted-foreground mb-1">Mejor Jugador (MOTM)</p>
-                        <p className="font-bold flex items-center gap-2">
-                          <Award className="h-4 w-4 text-amber-400" />
-                          {topMotms[0]?.player.name} ({topMotms[0]?.count} MOTM)
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                  <DialogFooter>
-                    <Button variant="outline" onClick={() => setCloseSeasonDialog(false)}>
-                      Cancelar
+            <div className="flex gap-2">
+              <Button variant="ghost" size="icon" onClick={loadData}>
+                <RefreshCw className="h-4 w-4" />
+              </Button>
+              {currentSeason && isAdmin && (
+                <Dialog open={closeSeasonDialog} onOpenChange={setCloseSeasonDialog}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm" className="gap-1">
+                      <Lock className="h-3 w-3" />
+                      Cerrar
                     </Button>
-                    <Button onClick={handleCloseSeason}>
-                      Confirmar y Cerrar
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Cerrar Temporada</DialogTitle>
+                      <DialogDescription>
+                        Estas seguro de cerrar {currentSeason.name}? Se guardara un registro historico.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4 space-y-3">
+                      {topScorers.length > 0 && (
+                        <div className="rounded-lg bg-secondary/50 p-3">
+                          <p className="text-sm text-muted-foreground mb-1">Goleador de la temporada</p>
+                          <p className="font-bold flex items-center gap-2">
+                            <Medal className="h-4 w-4 text-yellow-500" />
+                            {topScorers[0]?.player.name} ({topScorers[0]?.goals} goles)
+                          </p>
+                        </div>
+                      )}
+                      {topMotms.length > 0 && (
+                        <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 p-3">
+                          <p className="text-sm text-muted-foreground mb-1">Mejor Jugador (MOTM)</p>
+                          <p className="font-bold flex items-center gap-2">
+                            <Award className="h-4 w-4 text-amber-400" />
+                            {topMotms[0]?.player.name} ({topMotms[0]?.count} MOTM)
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setCloseSeasonDialog(false)}>
+                        Cancelar
+                      </Button>
+                      <Button onClick={handleCloseSeason}>
+                        Confirmar y Cerrar
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              )}
+              {!currentSeason && isAdmin && (
+                <Dialog open={newSeasonDialog} onOpenChange={setNewSeasonDialog}>
+                  <DialogTrigger asChild>
+                    <Button size="sm" className="gap-1">
+                      <Plus className="h-3 w-3" />
+                      Nueva
                     </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-            )}
-            {!currentSeason && (
-              <Dialog open={newSeasonDialog} onOpenChange={setNewSeasonDialog}>
-                <DialogTrigger asChild>
-                  <Button size="sm" className="gap-1">
-                    <Plus className="h-3 w-3" />
-                    Nueva
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Nueva Temporada</DialogTitle>
-                    <DialogDescription>
-                      Iniciá una nueva temporada de fútbol 8
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="py-4">
-                    <Input
-                      placeholder="Ej: Clausura 2026"
-                      value={newSeasonName}
-                      onChange={(e) => setNewSeasonName(e.target.value)}
-                    />
-                  </div>
-                  <DialogFooter>
-                    <Button onClick={handleStartNewSeason} disabled={!newSeasonName.trim()}>
-                      Iniciar Temporada
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-            )}
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Nueva Temporada</DialogTitle>
+                      <DialogDescription>
+                        Inicia una nueva temporada de futbol 8
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4">
+                      <Input
+                        placeholder="Ej: Clausura 2026"
+                        value={newSeasonName}
+                        onChange={(e) => setNewSeasonName(e.target.value)}
+                      />
+                    </div>
+                    <DialogFooter>
+                      <Button onClick={handleStartNewSeason} disabled={!newSeasonName.trim()}>
+                        Iniciar Temporada
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -199,7 +275,7 @@ export function StatsDashboard() {
                     <span className="font-medium">{entry.player.name}</span>
                   </div>
                   <Badge variant="outline" className="font-bold">
-                    {entry.goals} ⚽
+                    {entry.goals} goles
                   </Badge>
                 </div>
               ))}
@@ -281,7 +357,7 @@ export function StatsDashboard() {
             <CardTitle className="text-base">Ranking de Puntaje</CardTitle>
           </div>
           <CardDescription className="text-xs">
-            Puntaje dinámico promediado
+            Puntaje dinamico promediado
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -298,13 +374,13 @@ export function StatsDashboard() {
                   <div>
                     <span className="font-medium">{player.name}</span>
                     <p className="text-xs text-muted-foreground">
-                      {player.totalMatches} partidos • {player.totalGoals} goles
+                      {player.total_matches} partidos - {player.total_goals} goles
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
                   <Star className="h-4 w-4 fill-primary text-primary" />
-                  <span className="font-bold">{player.dynamicRating.toFixed(1)}</span>
+                  <span className="font-bold">{player.dynamic_rating.toFixed(1)}</span>
                 </div>
               </div>
             ))}
@@ -321,14 +397,14 @@ export function StatsDashboard() {
           </div>
         </CardHeader>
         <CardContent>
-          {matchHistory.length > 0 ? (
+          {matches.length > 0 ? (
             <div className="space-y-2">
-              {matchHistory.slice(0, 10).map((match) => (
+              {matches.slice(0, 10).map((match) => (
                 <div
                   key={match.id}
                   className={cn(
                     "rounded-lg px-3 py-3",
-                    match.isSpecialEvent ? "bg-primary/10 border border-primary/30" : "bg-secondary/30"
+                    match.is_special_event ? "bg-primary/10 border border-primary/30" : "bg-secondary/30"
                   )}
                 >
                   <div className="flex items-center justify-between mb-2">
@@ -340,9 +416,9 @@ export function StatsDashboard() {
                         month: 'short'
                       })}
                     </div>
-                    {match.isSpecialEvent && (
+                    {match.is_special_event && (
                       <Badge variant="outline" className="text-xs border-primary/50 text-primary">
-                        Superclásico
+                        Superclasico
                       </Badge>
                     )}
                   </div>
@@ -352,18 +428,18 @@ export function StatsDashboard() {
                       <span className="text-sm">Blanco</span>
                       <span className={cn(
                         "text-xl font-bold",
-                        match.whiteScore > match.blackScore && "text-primary"
+                        match.white_score > match.black_score && "text-primary"
                       )}>
-                        {match.whiteScore}
+                        {match.white_score}
                       </span>
                     </div>
                     <span className="text-muted-foreground">-</span>
                     <div className="flex items-center gap-2">
                       <span className={cn(
                         "text-xl font-bold",
-                        match.blackScore > match.whiteScore && "text-primary"
+                        match.black_score > match.white_score && "text-primary"
                       )}>
-                        {match.blackScore}
+                        {match.black_score}
                       </span>
                       <span className="text-sm">Negro</span>
                       <div className="h-3 w-3 rounded-full bg-zinc-800 ring-1 ring-zinc-600" />
@@ -404,17 +480,17 @@ export function StatsDashboard() {
                         Cerrada
                       </Badge>
                     </div>
-                    <div className="space-y-1">
-                      {season.topScorer && (
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <div className="space-y-1 text-sm text-muted-foreground">
+                      {season.top_scorer_id && (
+                        <div className="flex items-center gap-2">
                           <Medal className="h-4 w-4 text-yellow-500" />
-                          Goleador: {getPlayerById(season.topScorer.playerId)?.name} ({season.topScorer.goals})
+                          Goleador: {season.top_scorer_goals} goles
                         </div>
                       )}
-                      {season.topMotm && (
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      {season.top_motm_id && (
+                        <div className="flex items-center gap-2">
                           <Award className="h-4 w-4 text-amber-400" />
-                          MOTM: {getPlayerById(season.topMotm.playerId)?.name} ({season.topMotm.count})
+                          MOTM: {season.top_motm_count} veces
                         </div>
                       )}
                     </div>
