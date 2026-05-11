@@ -25,10 +25,12 @@ import {
 } from "@/components/ui/dialog"
 import {
   BarChart3, Trophy, Target, Star, Calendar,
-  Medal, Lock, Plus, History, TrendingUp, Award, Loader2, RefreshCw
+  Medal, Lock, Plus, History, TrendingUp, Award, RefreshCw, ChevronRight
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { LoadingState } from "@/components/ui/spinner"
 import { useAuth } from "@/lib/auth-context"
+import { MatchDetailDrawer } from "@/components/match-detail-drawer"
 
 /* ── Medal badge ────────────────────────────────────── */
 function MedalBadge({ rank }: { rank: number }) {
@@ -111,6 +113,7 @@ export function StatsDashboard() {
   const [newSeasonName, setNewSeasonName] = useState("")
   const [closeSeasonDialog, setCloseSeasonDialog] = useState(false)
   const [newSeasonDialog, setNewSeasonDialog] = useState(false)
+  const [selectedMatch, setSelectedMatch] = useState<Match | null>(null)
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -166,13 +169,13 @@ export function StatsDashboard() {
   }
 
   const sortedByRating = [...players].sort((a, b) => b.dynamic_rating - a.dynamic_rating)
+  const playersById = new Map(players.map((p) => [p.id, p]))
+  const selectedMatchMotm =
+    selectedMatch?.motm_player_id ? playersById.get(selectedMatch.motm_player_id) ?? null : null
 
   /* ── Loading ── */
   if (loading) return (
-    <div className="glass rounded-2xl p-6 flex items-center justify-center gap-3">
-      <Loader2 className="h-5 w-5 animate-spin text-primary" />
-      <span className="text-sm text-muted-foreground">Cargando estadísticas…</span>
-    </div>
+    <LoadingState message="Cargando estadísticas" />
   )
 
   return (
@@ -520,17 +523,19 @@ export function StatsDashboard() {
       </Section>
 
       {/* ── Match history ── */}
-      <Section icon={History} title="Historial" subtitle="Últimos partidos">
+      <Section icon={History} title="Historial" subtitle="Últimos partidos · tocá para ver detalle">
         {matches.length > 0 ? (
           <div className="space-y-2">
             {matches.slice(0, 10).map((match, i) => {
               const wWin = match.white_score > match.black_score
               const bWin = match.black_score > match.white_score
               return (
-                <div
+                <button
                   key={match.id}
+                  onClick={() => setSelectedMatch(match)}
                   className={cn(
-                    "rounded-xl px-4 py-3 anim-fade-in border",
+                    "group relative w-full text-left rounded-xl px-4 py-3 anim-fade-in border",
+                    "transition-all duration-200 hover:translate-x-[2px] hover:border-primary/30",
                     match.is_special_event
                       ? "bg-primary/8 border-primary/25"
                       : "bg-secondary/25 border-border/20"
@@ -538,43 +543,71 @@ export function StatsDashboard() {
                   style={{ animationDelay: `${i * 0.04}s` }}
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                    <div
+                      className="flex items-center gap-1.5 text-[10px] text-muted-foreground uppercase"
+                      style={{
+                        fontFamily: "var(--font-mono), ui-monospace, monospace",
+                        letterSpacing: "0.08em",
+                      }}
+                    >
                       <Calendar className="h-3 w-3" />
                       {new Date(match.date).toLocaleDateString("es-AR", {
                         weekday: "short", day: "numeric", month: "short"
                       })}
                     </div>
                     {match.is_special_event && (
-                      <span className="text-[9px] font-bold tracking-widest uppercase px-2 py-0.5 rounded-full
-                        bg-primary/15 text-primary border border-primary/25">
-                        SUPERCLÁSICO
+                      <span
+                        className="text-[9px] uppercase px-2 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/25"
+                        style={{
+                          fontFamily: "var(--font-mono), ui-monospace, monospace",
+                          letterSpacing: "0.14em",
+                          fontWeight: 500,
+                        }}
+                      >
+                        Superclásico
                       </span>
                     )}
                   </div>
                   <div className="flex items-center justify-center gap-4">
                     <div className="flex items-center gap-2">
                       <div className="h-3 w-3 rounded-full bg-white" style={{ boxShadow: "0 0 6px rgba(255,255,255,0.5)" }} />
-                      <span className="text-xs font-medium">Blanco</span>
+                      <span className="text-xs font-medium text-muted-foreground/70">Blanco</span>
                       <span
-                        className={cn("text-2xl font-black", wWin && "text-primary")}
-                        style={{ fontFamily: "var(--font-mono), ui-monospace, monospace" }}
+                        className={cn(
+                          "text-[24px] font-semibold tabular-nums",
+                          wWin && "text-primary"
+                        )}
+                        style={{
+                          fontFamily: "var(--font-mono), ui-monospace, monospace",
+                          letterSpacing: "-0.05em",
+                        }}
                       >
                         {match.white_score}
                       </span>
                     </div>
-                    <span className="text-muted-foreground/50 font-bold text-sm">—</span>
+                    <span className="text-muted-foreground/30 font-light text-sm">—</span>
                     <div className="flex items-center gap-2">
                       <span
-                        className={cn("text-2xl font-black", bWin && "text-primary")}
-                        style={{ fontFamily: "var(--font-mono), ui-monospace, monospace" }}
+                        className={cn(
+                          "text-[24px] font-semibold tabular-nums",
+                          bWin && "text-primary"
+                        )}
+                        style={{
+                          fontFamily: "var(--font-mono), ui-monospace, monospace",
+                          letterSpacing: "-0.05em",
+                        }}
                       >
                         {match.black_score}
                       </span>
-                      <span className="text-xs font-medium">Negro</span>
+                      <span className="text-xs font-medium text-muted-foreground/70">Negro</span>
                       <div className="h-3 w-3 rounded-full bg-zinc-700" style={{ outline: "1.5px solid #555" }} />
                     </div>
                   </div>
-                </div>
+                  <ChevronRight
+                    className="absolute top-1/2 -translate-y-1/2 right-2 h-3.5 w-3.5 text-muted-foreground/30
+                      group-hover:text-primary group-hover:translate-x-0.5 transition-all"
+                  />
+                </button>
               )
             })}
           </div>
@@ -583,6 +616,14 @@ export function StatsDashboard() {
             No hay partidos registrados aún
           </p>
         )}
+
+        <MatchDetailDrawer
+          match={selectedMatch}
+          open={!!selectedMatch}
+          onClose={() => setSelectedMatch(null)}
+          playersById={playersById}
+          motmPlayer={selectedMatchMotm}
+        />
       </Section>
 
       {/* ── Past seasons ── */}

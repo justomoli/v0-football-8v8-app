@@ -4,7 +4,8 @@ import { useState } from "react"
 import { useAuth, usePlayersList } from "@/lib/auth-context"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Loader2, LogIn, User, Shield, Star, Trophy, Target, LogOut } from "lucide-react"
+import { LogIn, User, Shield, Star, Trophy, Target, LogOut } from "lucide-react"
+import { LoadingState, Spinner } from "@/components/ui/spinner"
 
 /* ── Rating bar ───────────────────────────────────────── */
 function RatingBar({ value }: { value: number }) {
@@ -56,11 +57,7 @@ export function PlayerLogin() {
 
   /* ── Loading ── */
   if (authLoading) {
-    return (
-      <div className="glass rounded-2xl p-6 flex items-center justify-center">
-        <Loader2 className="h-5 w-5 animate-spin text-primary" />
-      </div>
-    )
+    return <LoadingState message="Cargando sesión" />
   }
 
   /* ── Logged in ── */
@@ -200,7 +197,7 @@ export function PlayerLogin() {
           style={{ fontFamily: "var(--font-outfit, Outfit, sans-serif)" }}
         >
           {isLoggingIn ? (
-            <><Loader2 className="h-4 w-4 animate-spin" /> Ingresando…</>
+            <><Spinner className="h-4 w-4" /> Ingresando…</>
           ) : (
             <><LogIn className="h-4 w-4" /> Ingresar</>
           )}

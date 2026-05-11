@@ -21,7 +21,6 @@ import {
   Target,
   Award,
   Star,
-  Loader2,
   Hand,
   Zap,
   Users,
@@ -29,6 +28,7 @@ import {
   Medal,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { LoadingState } from "@/components/ui/spinner"
 
 interface HomeDashboardProps {
   onNavigate: (tab: string) => void
@@ -900,16 +900,7 @@ export function HomeDashboard({ onNavigate }: HomeDashboardProps) {
   )
 
   if (loading) {
-    return (
-      <div className="space-y-5">
-        <div className="glass rounded-2xl p-6 flex items-center justify-center gap-3">
-          <Loader2 className="h-5 w-5 animate-spin text-primary" />
-          <span className="text-sm text-muted-foreground">
-            Cargando dashboard…
-          </span>
-        </div>
-      </div>
-    )
+    return <LoadingState message="Cargando dashboard" />
   }
 
   return (

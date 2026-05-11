@@ -31,11 +31,11 @@ import {
   Star,
   Trash2,
   Tag,
-  Loader2,
   RefreshCw,
   Zap,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { LoadingState, Spinner } from "@/components/ui/spinner"
 
 interface WhatsAppParserProps {
   onPlayersConfirmed?: (playerIds: string[]) => void
@@ -160,12 +160,7 @@ export function WhatsAppParser({ onPlayersConfirmed }: WhatsAppParserProps) {
 
   /* ── Loading skeleton ── */
   if (loading) {
-    return (
-      <div className="glass rounded-2xl p-6 flex items-center justify-center gap-3">
-        <Loader2 className="h-5 w-5 animate-spin text-primary" />
-        <span className="text-sm text-muted-foreground">Cargando confirmados…</span>
-      </div>
-    )
+    return <LoadingState message="Cargando confirmados" />
   }
 
   const lineCount = rawText.split(/[\n,]/).filter(x => x.trim()).length
@@ -216,7 +211,7 @@ export function WhatsAppParser({ onPlayersConfirmed }: WhatsAppParserProps) {
           disabled={!rawText.trim() || processing}
         >
           {processing ? (
-            <><Loader2 className="h-4 w-4 animate-spin" /> Procesando…</>
+            <><Spinner className="h-4 w-4" /> Procesando…</>
           ) : (
             <><Zap className="h-4 w-4" /> Procesar {lineCount > 0 ? `(${lineCount} nombres)` : "Lista"}</>
           )}

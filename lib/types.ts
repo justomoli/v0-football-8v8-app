@@ -1,5 +1,7 @@
 // Database types matching Supabase schema
 
+export type PlayerPosition = 'GK' | 'DEF' | 'MID' | 'FWD'
+
 export interface Player {
   id: string
   name: string
@@ -9,6 +11,18 @@ export interface Player {
   motm_count: number
   is_admin: boolean
   is_goalkeeper?: boolean
+  // Profile fields (FIFA-style card)
+  height_cm?: number | null
+  weight_kg?: number | null
+  position?: PlayerPosition | null
+  shot?: number | null
+  pace?: number | null
+  passing?: number | null
+  dribbling?: number | null
+  defense?: number | null
+  physique?: number | null
+  photo_url?: string | null
+  nickname?: string | null
   created_at: string
   updated_at: string
 }

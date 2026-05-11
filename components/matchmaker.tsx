@@ -10,9 +10,10 @@ import type { Player, CurrentMatchSetup } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import {
   Shuffle, Copy, Check, Star, RefreshCw,
-  Users, ImageIcon, Loader2, Zap, TrendingUp
+  Users, ImageIcon, Zap, TrendingUp
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { LoadingState, Spinner } from "@/components/ui/spinner"
 import { TeamShareCard } from "./team-share-card"
 
 /* ── Rating bar ─────────────────────────────────────── */
@@ -257,12 +258,7 @@ export function Matchmaker() {
 
   /* ── Loading ── */
   if (loading) {
-    return (
-      <div className="glass rounded-2xl p-6 flex items-center justify-center gap-3">
-        <Loader2 className="h-5 w-5 animate-spin text-primary" />
-        <span className="text-sm text-muted-foreground">Cargando equipos…</span>
-      </div>
-    )
+    return <LoadingState message="Cargando equipos" />
   }
 
   return (
@@ -319,7 +315,7 @@ export function Matchmaker() {
           )}
         >
           {generating ? (
-            <><Loader2 className="h-4 w-4 animate-spin" /> Generando equipos…</>
+            <><Spinner className="h-4 w-4" /> Generando equipos…</>
           ) : teamsGenerated ? (
             <><RefreshCw className="h-4 w-4" /> Rebalancear Equipos</>
           ) : (

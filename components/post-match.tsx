@@ -7,16 +7,19 @@ import {
   getActiveSeason,
   saveMatchWithStats,
   createSeason,
+  clearMatchSetup,
 } from "@/lib/db"
-import type { Player, Season, CurrentMatchSetup } from "@/lib/types"
+import type { Player, Season, Match, CurrentMatchSetup } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Slider } from "@/components/ui/slider"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Trophy, Target, Star, Save, Sparkles, AlertCircle, Award, Loader2, CheckCircle2 } from "lucide-react"
+import { Trophy, Target, Star, Save, Sparkles, AlertCircle, Award, CheckCircle2, Copy, MessageCircle, RotateCcw } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { LoadingState, Spinner } from "@/components/ui/spinner"
+import { buildMatchMessage } from "@/lib/match-message"
 
 interface PlayerMatchInput {
   playerId: string
@@ -412,6 +415,10 @@ export function PostMatch() {
   const [isSpecialEvent, setIsSpecialEvent] = useState(false)
   const [fireworksActive, setFireworksActive] = useState(false)
   const [playerInputs, setPlayerInputs] = useState<Record<string, PlayerMatchInput>>({})
+  const [savedMessage, setSavedMessage] = useState<string | null>(null)
+  const [savedMatch, setSavedMatch] = useState<Match | null>(null)
+  const [savedMotm, setSavedMotm] = useState<Player | null>(null)
+  const [copyState, setCopyState] = useState<"idle" | "copied">("idle")
 
   const handleSpecialChange = (checked: boolean) => {
     setIsSpecialEvent(checked)
@@ -467,7 +474,7 @@ export function PostMatch() {
     if (!currentSeason) return
     setSaving(true)
     try {
-      await saveMatchWithStats(
+      const match = await saveMatchWithStats(
         currentSeason.id,
         whiteScore, blackScore,
         whiteTeamPlayers.map(p => p.id),
@@ -480,35 +487,236 @@ export function PostMatch() {
         isSpecialEvent,
         motmPlayerId || undefined
       )
+
+      // Build WhatsApp message before clearing state
+      const motm = motmPlayerId
+        ? allPlayers.find((p) => p.id === motmPlayerId) ?? null
+        : null
+      const message = buildMatchMessage({
+        match,
+        whiteTeam: whiteTeamPlayers.map((p) => ({
+          player: p,
+          goals: getPlayerInput(p.id).goals,
+          rating: getPlayerInput(p.id).rating,
+        })),
+        blackTeam: blackTeamPlayers.map((p) => ({
+          player: p,
+          goals: getPlayerInput(p.id).goals,
+          rating: getPlayerInput(p.id).rating,
+        })),
+        motmPlayer: motm,
+      })
+      setSavedMessage(message)
+      setSavedMatch(match)
+      setSavedMotm(motm)
+
+      // Clear current setup in DB so next session is fresh
+      await clearMatchSetup()
+
       setSaved(true)
-      setTimeout(() => {
-        setWhiteScore(0); setBlackScore(0)
-        setPlayerInputs({}); setIsSpecialEvent(false)
-        setMotmPlayerId(""); setSaved(false)
-      }, 3000)
-    } catch (e) { console.error(e) }
-    finally { setSaving(false) }
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleCopyMessage = async () => {
+    if (!savedMessage) return
+    try {
+      await navigator.clipboard.writeText(savedMessage)
+      setCopyState("copied")
+      setTimeout(() => setCopyState("idle"), 2200)
+    } catch (e) {
+      console.error("Clipboard failed:", e)
+    }
+  }
+
+  const handleNewMatch = () => {
+    setWhiteScore(0)
+    setBlackScore(0)
+    setPlayerInputs({})
+    setIsSpecialEvent(false)
+    setMotmPlayerId("")
+    setSaved(false)
+    setSavedMessage(null)
+    setSavedMatch(null)
+    setSavedMotm(null)
+    setWhiteTeamPlayers([])
+    setBlackTeamPlayers([])
+    setSetup(null)
   }
 
   /* ── States ── */
   if (loading) return (
-    <div className="glass rounded-2xl p-6 flex items-center justify-center gap-3">
-      <Loader2 className="h-5 w-5 animate-spin text-primary" />
-      <span className="text-sm text-muted-foreground">Cargando partido…</span>
-    </div>
+    <LoadingState message="Cargando partido" />
   )
 
-  if (saved) return (
-    <div className="glass rounded-2xl p-12 text-center anim-scale-in neon-border">
-      <div className="anim-glow-pulse w-fit mx-auto rounded-full p-4 bg-primary/10 mb-4">
-        <CheckCircle2 className="h-12 w-12 text-primary" />
+  if (saved && savedMatch) return (
+    <div className="space-y-5">
+      {/* Confirmation card */}
+      <div className="glass rounded-2xl p-6 anim-scale-in neon-border">
+        <div className="flex items-center gap-3 mb-5">
+          <div className="anim-glow-pulse shrink-0 rounded-2xl p-2.5 bg-primary/15 border border-primary/30">
+            <CheckCircle2 className="h-6 w-6 text-primary" />
+          </div>
+          <div>
+            <h3 className="text-[18px] font-semibold leading-tight tracking-tight">
+              Partido guardado
+            </h3>
+            <p className="text-muted-foreground/65 text-[12px] mt-0.5">
+              Ratings actualizados · setup reiniciado
+            </p>
+          </div>
+        </div>
+
+        {/* Recap: score */}
+        <div className="rounded-xl bg-white/[0.03] border border-white/[0.08] p-4">
+          <div className="flex items-center justify-center gap-6">
+            <div className="flex flex-col items-center gap-1.5">
+              <span
+                className="h-2.5 w-2.5 rounded-full"
+                style={{
+                  background: "white",
+                  boxShadow: "0 0 8px rgba(255,255,255,0.5)",
+                }}
+              />
+              <span
+                className="text-[10px] text-muted-foreground/65 uppercase"
+                style={{
+                  fontFamily: "var(--font-mono), ui-monospace, monospace",
+                  letterSpacing: "0.1em",
+                }}
+              >
+                Blanco
+              </span>
+              <span
+                className={cn(
+                  "text-[36px] font-semibold leading-none tabular-nums",
+                  savedMatch.white_score > savedMatch.black_score && "text-primary"
+                )}
+                style={{
+                  fontFamily: "var(--font-mono), ui-monospace, monospace",
+                  letterSpacing: "-0.05em",
+                }}
+              >
+                {savedMatch.white_score}
+              </span>
+            </div>
+            <span className="text-muted-foreground/25 font-light text-xl pb-2 select-none">—</span>
+            <div className="flex flex-col items-center gap-1.5">
+              <span
+                className="h-2.5 w-2.5 rounded-full"
+                style={{
+                  background: "#1a1a1a",
+                  outline: "1.5px solid #555",
+                  outlineOffset: "1px",
+                }}
+              />
+              <span
+                className="text-[10px] text-muted-foreground/65 uppercase"
+                style={{
+                  fontFamily: "var(--font-mono), ui-monospace, monospace",
+                  letterSpacing: "0.1em",
+                }}
+              >
+                Negro
+              </span>
+              <span
+                className={cn(
+                  "text-[36px] font-semibold leading-none tabular-nums",
+                  savedMatch.black_score > savedMatch.white_score && "text-primary"
+                )}
+                style={{
+                  fontFamily: "var(--font-mono), ui-monospace, monospace",
+                  letterSpacing: "-0.05em",
+                }}
+              >
+                {savedMatch.black_score}
+              </span>
+            </div>
+          </div>
+
+          {savedMotm && (
+            <div
+              className="mt-4 flex items-center gap-2.5 rounded-lg px-3 py-2"
+              style={{
+                background: "oklch(0.85 0.16 85 / 0.08)",
+                border: "1px solid oklch(0.85 0.16 85 / 0.20)",
+              }}
+            >
+              <Award className="h-3.5 w-3.5 shrink-0" style={{ color: "oklch(0.85 0.16 85)" }} />
+              <div className="flex-1 min-w-0">
+                <div
+                  className="text-[9px] uppercase text-amber-400/75"
+                  style={{
+                    fontFamily: "var(--font-mono), ui-monospace, monospace",
+                    letterSpacing: "0.1em",
+                  }}
+                >
+                  Jugador del partido
+                </div>
+                <div className="text-[13px] font-medium truncate leading-tight mt-0.5">
+                  {savedMotm.name}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
-      <h3 className="text-[22px] font-semibold mb-2 tracking-tight">
-        Partido guardado
-      </h3>
-      <p className="text-muted-foreground/70 text-[14px]">
-        Ratings dinámicos actualizados correctamente
-      </p>
+
+      {/* Action buttons */}
+      <div className="grid gap-2">
+        <Button
+          onClick={handleCopyMessage}
+          className={cn(
+            "w-full gap-2 font-semibold transition-all duration-200 active:scale-[0.98]",
+            copyState === "copied"
+              ? "bg-primary/85 hover:bg-primary/85"
+              : "shadow-[0_0_20px_oklch(0.75_0.18_160/0.25)] hover:shadow-[0_0_28px_oklch(0.75_0.18_160/0.4)]"
+          )}
+        >
+          {copyState === "copied" ? (
+            <>
+              <CheckCircle2 className="h-4 w-4" />
+              ¡Copiado! Pegalo en el grupo
+            </>
+          ) : (
+            <>
+              <MessageCircle className="h-4 w-4" />
+              Copiar mensaje para WhatsApp
+            </>
+          )}
+        </Button>
+
+        <Button
+          onClick={handleNewMatch}
+          variant="outline"
+          className="w-full gap-2 border-border/40 hover:bg-white/5"
+        >
+          <RotateCcw className="h-4 w-4" />
+          Nuevo partido
+        </Button>
+      </div>
+
+      {/* Message preview (collapsed) */}
+      {savedMessage && (
+        <details className="glass rounded-2xl px-4 py-3 group">
+          <summary className="cursor-pointer flex items-center justify-between text-[12px] font-medium text-muted-foreground/75 hover:text-foreground transition-colors">
+            <span className="flex items-center gap-2">
+              <Copy className="h-3 w-3" />
+              Ver preview del mensaje
+            </span>
+            <span className="text-[10px] opacity-50 group-open:rotate-180 transition-transform">▼</span>
+          </summary>
+          <pre
+            className="mt-3 text-[11px] leading-relaxed whitespace-pre-wrap text-foreground/80 max-h-[280px] overflow-auto"
+            style={{ fontFamily: "var(--font-mono), ui-monospace, monospace" }}
+          >
+            {savedMessage}
+          </pre>
+        </details>
+      )}
     </div>
   )
 
@@ -747,7 +955,7 @@ export function PostMatch() {
           )}
         >
           {saving ? (
-            <><Loader2 className="h-4 w-4 animate-spin" /> Guardando…</>
+            <><Spinner className="h-4 w-4" /> Guardando…</>
           ) : (
             <><Save className="h-4 w-4" /> Guardar Partido</>
           )}

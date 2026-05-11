@@ -48,12 +48,12 @@ import {
   Tag,
   Plus,
   X,
-  Loader2,
   RefreshCw,
   Users,
   Hand
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { Spinner } from "@/components/ui/spinner"
 
 export function AdminPanel() {
   const { isAdmin, player } = useAuth()
@@ -263,7 +263,7 @@ export function AdminPanel() {
         <CardContent>
           {loading ? (
             <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              <Spinner className="h-6 w-6 text-primary" />
             </div>
           ) : (
             <div className="space-y-2">

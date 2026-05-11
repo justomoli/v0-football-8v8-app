@@ -142,6 +142,69 @@
   to   { background-position: 200% center; }
 }
 
+@keyframes logoLoaderPulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.96;
+    transform: scale(1.045);
+  }
+}
+
+@keyframes logoLoaderHalo {
+  0%, 100% {
+    opacity: 0.45;
+    transform: scale(0.92);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.18);
+  }
+}
+
+@keyframes logoTraceSweep {
+  from { stroke-dashoffset: 1; }
+  to   { stroke-dashoffset: 0; }
+}
+
+@keyframes logoSparkSweep {
+  0% {
+    opacity: 0;
+    stroke-dashoffset: 1;
+  }
+  14%, 72% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    stroke-dashoffset: 0;
+  }
+}
+
+.logo-loader-trace path {
+  animation: logoTraceSweep 2.4s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+  filter: drop-shadow(0 0 8px oklch(0.8 0.15 195 / 0.8));
+  opacity: 0.7;
+  stroke-dasharray: 0.08 0.92;
+}
+
+.logo-loader-spark path {
+  animation: logoSparkSweep 2.4s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+  filter:
+    drop-shadow(0 0 5px oklch(1 0 0 / 0.95))
+    drop-shadow(0 0 14px oklch(0.75 0.18 160 / 0.8));
+  stroke-dasharray: 0.018 0.982;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logo-loader-trace path,
+  .logo-loader-spark path {
+    animation: none;
+  }
+}
+
 /* ═══════════════════════════════════
    ANIMATION UTILITY CLASSES
 ═══════════════════════════════════ */

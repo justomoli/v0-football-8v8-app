@@ -309,24 +309,29 @@ export async function saveMatchWithStats(
     // Get current player
     const player = await getPlayerById(stat.playerId)
     if (!player) continue
-    
-    // Add rating to history
+
+    // Effective rating: feeling-based rating + goal bonus (cap +1.5)
+    // 1 gol → +0.3, 2 → +0.6, 3 → +0.9, 4 → +1.2, 5+ → +1.5
+    const goalBonus = Math.min(stat.goals * 0.3, 1.5)
+    const effectiveRating = Math.min(10, stat.rating + goalBonus)
+
+    // Add effective rating to history (so future avg reflects the goal contribution)
     await supabase.from('player_ratings').insert({
       player_id: stat.playerId,
-      rating: stat.rating,
+      rating: effectiveRating,
       match_id: match.id
     })
-    
+
     // Get all ratings for dynamic average
     const { data: ratings } = await supabase
       .from('player_ratings')
       .select('rating')
       .eq('player_id', stat.playerId)
-    
-    const avgRating = ratings 
+
+    const avgRating = ratings
       ? ratings.reduce((sum, r) => sum + Number(r.rating), 0) / ratings.length
-      : stat.rating
-    
+      : effectiveRating
+
     // Update player
     await updatePlayer(stat.playerId, {
       total_goals: player.total_goals + stat.goals,
@@ -335,7 +340,7 @@ export async function saveMatchWithStats(
       motm_count: motmPlayerId === stat.playerId ? player.motm_count + 1 : player.motm_count
     })
   }
-  
+
   return match
 }
 
