@@ -8,6 +8,7 @@ export interface Player {
   total_matches: number
   motm_count: number
   is_admin: boolean
+  is_goalkeeper?: boolean
   created_at: string
   updated_at: string
 }

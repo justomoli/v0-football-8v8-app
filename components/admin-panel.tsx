@@ -40,17 +40,18 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { 
-  Settings, 
-  UserPlus, 
-  Trash2, 
-  Edit, 
-  Shield, 
+  Settings,
+  UserPlus,
+  Trash2,
+  Edit,
+  Shield,
   Tag,
   Plus,
   X,
   Loader2,
   RefreshCw,
-  Users
+  Users,
+  Hand
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -102,7 +103,8 @@ export function AdminPanel() {
       await updatePlayer(editingPlayer.id, {
         name: editingPlayer.name,
         dynamic_rating: editingPlayer.dynamic_rating,
-        is_admin: editingPlayer.is_admin
+        is_admin: editingPlayer.is_admin,
+        is_goalkeeper: editingPlayer.is_goalkeeper ?? false
       })
       await loadPlayers()
       setEditingPlayer(null)
@@ -284,12 +286,18 @@ export function AdminPanel() {
                       {p.dynamic_rating.toFixed(1)}
                     </div>
                     <div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-medium">{p.name}</span>
                         {p.is_admin && (
                           <Badge variant="outline" className="text-xs border-amber-500/50 text-amber-400">
                             <Shield className="mr-1 h-3 w-3" />
                             Admin
+                          </Badge>
+                        )}
+                        {p.is_goalkeeper && (
+                          <Badge variant="outline" className="text-xs border-amber-400/50 text-amber-300">
+                            <Hand className="mr-1 h-3 w-3" />
+                            GK
                           </Badge>
                         )}
                       </div>
@@ -379,6 +387,17 @@ export function AdminPanel() {
                   onCheckedChange={(checked) => setEditingPlayer({ ...editingPlayer, is_admin: checked })}
                 />
                 <Label htmlFor="edit-admin">Es Administrador</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="edit-goalkeeper"
+                  checked={!!editingPlayer.is_goalkeeper}
+                  onCheckedChange={(checked) => setEditingPlayer({ ...editingPlayer, is_goalkeeper: checked })}
+                />
+                <Label htmlFor="edit-goalkeeper" className="flex items-center gap-1.5">
+                  <Hand className="h-3.5 w-3.5 text-amber-400" />
+                  Atajador / Arquero
+                </Label>
               </div>
               
               {/* Aliases Section */}

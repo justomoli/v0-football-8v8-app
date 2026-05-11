@@ -3,7 +3,7 @@
 import { useRef, useState } from "react"
 import type { Player } from "@/lib/types"
 import { Button } from "@/components/ui/button"
-import { Download, Share2, Check } from "lucide-react"
+import { Download, Share2, Check, Hand } from "lucide-react"
 import { toPng } from "html-to-image"
 import { cn } from "@/lib/utils"
 
@@ -12,47 +12,99 @@ interface TeamShareCardProps {
   blackTeam: Player[]
 }
 
+/* ─── Player line — minimal, no rating, with optional GK badge ─── */
+function PlayerLine({
+  player,
+  index,
+  variant,
+}: {
+  player: Player
+  index: number
+  variant: "white" | "black"
+}) {
+  const isWhite = variant === "white"
+  const isGK = !!player.is_goalkeeper
+
+  return (
+    <div
+      className={cn(
+        "flex items-center gap-2.5 px-2.5 py-1.5 rounded-md",
+        isWhite ? "bg-white/[0.06]" : "bg-black/40"
+      )}
+    >
+      {/* Jersey number */}
+      <span
+        className="shrink-0 w-6 text-center text-[12px] font-semibold tabular-nums leading-none"
+        style={{
+          fontFamily: "var(--font-mono), ui-monospace, monospace",
+          color: isWhite ? "rgba(255,255,255,0.55)" : "rgba(255,255,255,0.4)",
+          letterSpacing: "-0.04em",
+        }}
+      >
+        {String(index + 1).padStart(2, "0")}
+      </span>
+
+      {/* Name */}
+      <span
+        className={cn(
+          "flex-1 truncate text-[14px] font-semibold leading-tight",
+          isWhite ? "text-white" : "text-white/85"
+        )}
+        style={{
+          fontFamily: "'Outfit', var(--font-outfit), sans-serif",
+          letterSpacing: "-0.005em",
+        }}
+      >
+        {player.name}
+      </span>
+
+      {/* GK badge */}
+      {isGK && (
+        <span
+          className="shrink-0 inline-flex items-center justify-center h-5 w-5 rounded-md"
+          style={{
+            background: "oklch(0.85 0.16 85 / 0.20)",
+            border: "1px solid oklch(0.85 0.16 85 / 0.55)",
+            boxShadow: "0 0 8px oklch(0.85 0.16 85 / 0.35)",
+          }}
+          title="Arquero"
+        >
+          <Hand className="h-3 w-3" style={{ color: "oklch(0.92 0.14 90)" }} />
+        </span>
+      )}
+    </div>
+  )
+}
+
 export function TeamShareCard({ whiteTeam, blackTeam }: TeamShareCardProps) {
   const cardRef = useRef<HTMLDivElement>(null)
   const [downloading, setDownloading] = useState(false)
   const [copied, setCopied] = useState(false)
 
-  const getTeamTotal = (team: Player[]) => {
-    return team.reduce((sum, p) => sum + p.dynamic_rating, 0)
-  }
-
-  const getRatingColor = (rating: number) => {
-    if (rating >= 9) return "from-yellow-400 to-amber-500"
-    if (rating >= 8) return "from-emerald-400 to-teal-500"
-    if (rating >= 7) return "from-cyan-400 to-blue-500"
-    if (rating >= 6) return "from-blue-400 to-indigo-500"
-    return "from-slate-400 to-slate-500"
-  }
-
   const today = new Date()
-  const formattedDate = today.toLocaleDateString('es-AR', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long'
-  })
+  const formattedDate = today
+    .toLocaleDateString("es-AR", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+    })
+    .toUpperCase()
 
   const handleDownload = async () => {
     if (!cardRef.current) return
     setDownloading(true)
-    
     try {
       const dataUrl = await toPng(cardRef.current, {
         quality: 1,
         pixelRatio: 2,
-        backgroundColor: '#0a0a12',
+        backgroundColor: "#08100c",
       })
-      
-      const link = document.createElement('a')
-      link.download = `equipos-${today.toISOString().split('T')[0]}.png`
+      const link = document.createElement("a")
+      link.download = `equipos-${today.toISOString().split("T")[0]}.png`
       link.href = dataUrl
       link.click()
     } catch (error) {
-      console.error('Error generating image:', error)
+      console.error("Error generating image:", error)
     } finally {
       setDownloading(false)
     }
@@ -60,22 +112,18 @@ export function TeamShareCard({ whiteTeam, blackTeam }: TeamShareCardProps) {
 
   const handleCopyImage = async () => {
     if (!cardRef.current) return
-    
     try {
       const dataUrl = await toPng(cardRef.current, {
         quality: 1,
         pixelRatio: 2,
-        backgroundColor: '#0a0a12',
+        backgroundColor: "#08100c",
       })
-      
       const blob = await (await fetch(dataUrl)).blob()
-      await navigator.clipboard.write([
-        new ClipboardItem({ 'image/png': blob })
-      ])
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })])
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch (error) {
-      console.error('Error copying image:', error)
+      console.error("Error copying image:", error)
     }
   }
 
@@ -83,122 +131,185 @@ export function TeamShareCard({ whiteTeam, blackTeam }: TeamShareCardProps) {
 
   return (
     <div className="space-y-3">
-      {/* Shareable Card */}
+      {/* ── Shareable card ── */}
       <div
         ref={cardRef}
-        className="relative overflow-hidden rounded-xl border border-cyan-500/30 bg-gradient-to-br from-[#0a0a12] via-[#0f1020] to-[#0a0a12] p-4"
-        style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}
+        className="relative overflow-hidden rounded-2xl p-5"
+        style={{
+          background:
+            "linear-gradient(160deg, #0b1410 0%, #08100c 50%, #060d0a 100%)",
+          border: "1px solid oklch(0.78 0.22 145 / 0.25)",
+          fontFamily: "'Outfit', var(--font-outfit), sans-serif",
+        }}
       >
-        {/* Neon glow effects */}
-        <div className="pointer-events-none absolute -left-20 -top-20 h-40 w-40 rounded-full bg-cyan-500/20 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-20 -right-20 h-40 w-40 rounded-full bg-emerald-500/20 blur-3xl" />
-        
+        {/* Decorative blobs — neon green palette */}
+        <div
+          className="pointer-events-none absolute -left-16 -top-16 h-44 w-44 rounded-full"
+          style={{
+            background: "oklch(0.78 0.22 145 / 0.18)",
+            filter: "blur(60px)",
+          }}
+        />
+        <div
+          className="pointer-events-none absolute -bottom-16 -right-16 h-44 w-44 rounded-full"
+          style={{
+            background: "oklch(0.85 0.16 85 / 0.10)",
+            filter: "blur(60px)",
+          }}
+        />
+
         {/* Header */}
-        <div className="relative mb-4 text-center">
-          <div className="mb-1 text-xs font-medium uppercase tracking-[0.2em] text-cyan-400/80">
-            {formattedDate}
+        <div className="relative mb-5 text-center">
+          <div
+            className="text-[10px] font-bold tracking-[0.22em] uppercase mb-1.5"
+            style={{
+              color: "oklch(0.78 0.22 145)",
+              fontFamily: "'Outfit', var(--font-outfit), sans-serif",
+            }}
+          >
+            {formattedDate} · 20:00
           </div>
-          <h2 className="bg-gradient-to-r from-white via-cyan-200 to-white bg-clip-text text-xl font-bold tracking-tight text-transparent">
-            EQUIPOS JUEVES - 20:00hs
+          <h2
+            className="text-[28px] font-semibold leading-none"
+            style={{
+              fontFamily: "var(--font-sans), system-ui, sans-serif",
+              letterSpacing: "-0.04em",
+              background:
+                "linear-gradient(180deg, #ffffff 0%, oklch(0.92 0.04 145) 100%)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              backgroundClip: "text",
+            }}
+          >
+            Equipos
           </h2>
-          <div className="mt-1 flex items-center justify-center gap-2">
-            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent" />
-            <span className="text-xs font-bold text-cyan-400">SB5</span>
-            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent" />
+          <div className="mt-3 mx-auto flex items-center justify-center gap-2 max-w-[180px]">
+            <div
+              className="h-px flex-1"
+              style={{
+                background:
+                  "linear-gradient(90deg, transparent, oklch(0.78 0.22 145 / 0.55), transparent)",
+              }}
+            />
+            <span
+              className="h-1 w-1 rounded-full"
+              style={{
+                background: "oklch(0.78 0.22 145)",
+                boxShadow: "0 0 6px oklch(0.78 0.22 145)",
+              }}
+            />
+            <div
+              className="h-px flex-1"
+              style={{
+                background:
+                  "linear-gradient(90deg, transparent, oklch(0.78 0.22 145 / 0.55), transparent)",
+              }}
+            />
           </div>
         </div>
 
-        {/* Teams Grid */}
-        <div className="grid grid-cols-2 gap-3">
-          {/* White Team */}
-          <div className="rounded-lg border border-white/20 bg-white/5 p-3">
-            <div className="mb-2 flex items-center justify-center gap-2">
-              <div className="h-3 w-3 rounded-full bg-white shadow-lg shadow-white/30" />
-              <span className="text-sm font-bold text-white">BLANCO</span>
-            </div>
-            <div className="space-y-1.5">
-              {whiteTeam.map((player) => (
-                <div
-                  key={player.id}
-                  className="flex items-center justify-between rounded-md bg-white/10 px-2 py-1.5"
-                >
-                  <span className="truncate text-xs font-medium text-white/90">
-                    {player.name}
-                  </span>
-                  <div
-                    className={cn(
-                      "flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br text-[10px] font-bold text-white shadow-lg",
-                      getRatingColor(player.dynamic_rating)
-                    )}
-                  >
-                    {player.dynamic_rating.toFixed(0)}
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="mt-2 border-t border-white/10 pt-2 text-center">
-              <span className="text-xs text-white/60">Total: </span>
-              <span className="text-sm font-bold text-white">
-                {getTeamTotal(whiteTeam).toFixed(1)}
+        {/* Teams grid */}
+        <div className="relative grid grid-cols-2 gap-3">
+          {/* White team */}
+          <div
+            className="rounded-xl p-3"
+            style={{
+              background: "rgba(255,255,255,0.04)",
+              border: "1px solid rgba(255,255,255,0.10)",
+            }}
+          >
+            <div className="mb-2.5 flex items-center justify-center gap-2">
+              <span
+                className="h-2.5 w-2.5 rounded-full"
+                style={{
+                  background: "white",
+                  boxShadow: "0 0 8px rgba(255,255,255,0.6)",
+                }}
+              />
+              <span
+                className="text-[11px] font-bold tracking-[0.18em] uppercase"
+                style={{
+                  fontFamily: "'Outfit', var(--font-outfit), sans-serif",
+                  color: "rgba(255,255,255,0.95)",
+                }}
+              >
+                Blanco
               </span>
+            </div>
+            <div className="space-y-1">
+              {whiteTeam.map((p, i) => (
+                <PlayerLine key={p.id} player={p} index={i} variant="white" />
+              ))}
             </div>
           </div>
 
-          {/* Black Team */}
-          <div className="rounded-lg border border-zinc-600/30 bg-zinc-900/50 p-3">
-            <div className="mb-2 flex items-center justify-center gap-2">
-              <div className="h-3 w-3 rounded-full bg-zinc-800 ring-2 ring-zinc-500 shadow-lg" />
-              <span className="text-sm font-bold text-zinc-300">NEGRO</span>
-            </div>
-            <div className="space-y-1.5">
-              {blackTeam.map((player) => (
-                <div
-                  key={player.id}
-                  className="flex items-center justify-between rounded-md bg-zinc-800/50 px-2 py-1.5"
-                >
-                  <span className="truncate text-xs font-medium text-zinc-300">
-                    {player.name}
-                  </span>
-                  <div
-                    className={cn(
-                      "flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br text-[10px] font-bold text-white shadow-lg",
-                      getRatingColor(player.dynamic_rating)
-                    )}
-                  >
-                    {player.dynamic_rating.toFixed(0)}
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="mt-2 border-t border-zinc-700/50 pt-2 text-center">
-              <span className="text-xs text-zinc-500">Total: </span>
-              <span className="text-sm font-bold text-zinc-300">
-                {getTeamTotal(blackTeam).toFixed(1)}
+          {/* Black team */}
+          <div
+            className="rounded-xl p-3"
+            style={{
+              background: "rgba(0,0,0,0.45)",
+              border: "1px solid rgba(255,255,255,0.06)",
+            }}
+          >
+            <div className="mb-2.5 flex items-center justify-center gap-2">
+              <span
+                className="h-2.5 w-2.5 rounded-full"
+                style={{
+                  background: "#1a1a1a",
+                  outline: "1.5px solid #555",
+                  outlineOffset: "1px",
+                }}
+              />
+              <span
+                className="text-[11px] font-bold tracking-[0.18em] uppercase"
+                style={{
+                  fontFamily: "'Outfit', var(--font-outfit), sans-serif",
+                  color: "rgba(255,255,255,0.7)",
+                }}
+              >
+                Negro
               </span>
+            </div>
+            <div className="space-y-1">
+              {blackTeam.map((p, i) => (
+                <PlayerLine key={p.id} player={p} index={i} variant="black" />
+              ))}
             </div>
           </div>
         </div>
 
-        {/* Balance indicator */}
-        <div className="mt-3 flex items-center justify-center gap-2 text-xs">
-          <span className="text-cyan-400/80">Diferencia:</span>
-          <span className={cn(
-            "font-bold",
-            Math.abs(getTeamTotal(whiteTeam) - getTeamTotal(blackTeam)) < 2
-              ? "text-emerald-400"
-              : "text-amber-400"
-          )}>
-            {Math.abs(getTeamTotal(whiteTeam) - getTeamTotal(blackTeam)).toFixed(1)} pts
+        {/* Footer watermark */}
+        <div className="relative mt-4 flex items-center justify-center gap-1.5">
+          <span
+            className="h-1 w-1 rounded-full"
+            style={{
+              background: "oklch(0.78 0.22 145 / 0.55)",
+            }}
+          />
+          <span
+            className="text-[9px] font-bold tracking-[0.25em] uppercase"
+            style={{
+              color: "rgba(255,255,255,0.32)",
+              fontFamily: "'Outfit', var(--font-outfit), sans-serif",
+            }}
+          >
+            futjueves · F8
           </span>
+          <span
+            className="h-1 w-1 rounded-full"
+            style={{
+              background: "oklch(0.78 0.22 145 / 0.55)",
+            }}
+          />
         </div>
       </div>
 
-      {/* Action Buttons */}
+      {/* ── Action buttons ── */}
       <div className="flex gap-2">
         <Button
           onClick={handleDownload}
           variant="outline"
-          className="flex-1 gap-2 border-cyan-500/30 hover:bg-cyan-500/10"
+          className="flex-1 gap-2 border-primary/30 hover:bg-primary/10"
           disabled={downloading}
         >
           <Download className="h-4 w-4" />
@@ -207,11 +318,11 @@ export function TeamShareCard({ whiteTeam, blackTeam }: TeamShareCardProps) {
         <Button
           onClick={handleCopyImage}
           variant="outline"
-          className="flex-1 gap-2 border-emerald-500/30 hover:bg-emerald-500/10"
+          className="flex-1 gap-2 border-primary/30 hover:bg-primary/10"
         >
           {copied ? (
             <>
-              <Check className="h-4 w-4 text-emerald-400" />
+              <Check className="h-4 w-4 text-primary" />
               Copiado
             </>
           ) : (
