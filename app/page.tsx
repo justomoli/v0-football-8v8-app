@@ -6,6 +6,7 @@ import { Navigation } from "@/components/navigation"
 import { PlayerLogin } from "@/components/player-login"
 import { HomeDashboard } from "@/components/home-dashboard"
 import { WhatsAppParser } from "@/components/whatsapp-parser"
+import { PlayersRoster } from "@/components/players-roster"
 import { Matchmaker } from "@/components/matchmaker"
 import { PostMatch } from "@/components/post-match"
 import { StatsDashboard } from "@/components/stats-dashboard"
@@ -41,6 +42,7 @@ function TabContent({ tab, onNavigate }: { tab: string; onNavigate: (t: string) 
     <div key={tab} className="anim-fade-up">
       {tab === "home"       && <HomeDashboard onNavigate={onNavigate} />}
       {tab === "parser"     && <WhatsAppParser />}
+      {tab === "players"    && <PlayersRoster />}
       {tab === "matchmaker" && <Matchmaker />}
       {tab === "postmatch"  && <PostMatch />}
       {tab === "stats"      && <StatsDashboard />}
@@ -88,14 +90,14 @@ function AppContent() {
                     fontWeight: 600,
                   }}
                 >
-                  F8
+                  FJ
                 </div>
               </div>
               <h1
                 className="text-[15px] font-semibold leading-none tracking-tight"
                 style={{ letterSpacing: "-0.02em" }}
               >
-                Futbol 8
+                FUTJUEVES
               </h1>
             </div>
 
@@ -107,7 +109,7 @@ function AppContent() {
                     className="h-1.5 w-1.5 rounded-full bg-primary"
                     style={{ animation: "glowPulse 2s ease-in-out infinite" }}
                   />
-                  <span className="text-[12px] font-medium text-primary max-w-[80px] truncate tracking-tight">
+                  <span className="max-w-[132px] truncate text-[12px] font-medium tracking-tight text-primary">
                     {player.name}
                   </span>
                 </div>

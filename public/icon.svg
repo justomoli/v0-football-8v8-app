@@ -1,26 +1,38 @@
-<svg width="180" height="180" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <style>
-    @media (prefers-color-scheme: light) {
-      .background { fill: black; }
-      .foreground { fill: white; }
-    }
-    @media (prefers-color-scheme: dark) {
-      .background { fill: white; }
-      .foreground { fill: black; }
-    }
-  </style>
-  <g clip-path="url(#clip0_7960_43945)">
-    <rect class="background" width="180" height="180" rx="37" />
-    <g style="transform: scale(95%); transform-origin: center">
-      <path class="foreground"
-        d="M101.141 53H136.632C151.023 53 162.689 64.6662 162.689 79.0573V112.904H148.112V79.0573C148.112 78.7105 148.098 78.3662 148.072 78.0251L112.581 112.898C112.701 112.902 112.821 112.904 112.941 112.904H148.112V126.672H112.941C98.5504 126.672 86.5638 114.891 86.5638 100.5V66.7434H101.141V100.5C101.141 101.15 101.191 101.792 101.289 102.422L137.56 66.7816C137.255 66.7563 136.945 66.7434 136.632 66.7434H101.141V53Z" />
-      <path class="foreground"
-        d="M65.2926 124.136L14 66.7372H34.6355L64.7495 100.436V66.7372H80.1365V118.47C80.1365 126.278 70.4953 129.958 65.2926 124.136Z" />
-    </g>
-  </g>
+<svg xmlns="http://www.w3.org/2000/svg" width="180" height="180" viewBox="0 0 180 180" fill="none" role="img">
+  <title>Fulbito SB5</title>
   <defs>
-    <clipPath id="clip0_7960_43945">
-      <rect width="180" height="180" fill="white" />
-    </clipPath>
+    <radialGradient id="shine" cx="32%" cy="28%" r="72%">
+      <stop offset="0%" stop-color="#93facc"/>
+      <stop offset="42%" stop-color="#45d698"/>
+      <stop offset="100%" stop-color="#0f5c45"/>
+    </radialGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="2.2" result="b"/>
+      <feMerge>
+        <feMergeNode in="b"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
   </defs>
+  <!-- Fondo: tono cercano al theme oscuro del sitio -->
+  <rect width="180" height="180" rx="40" fill="#061018"/>
+  <!-- Halo verde (glass / neon del sitio) -->
+  <circle cx="90" cy="93" r="71" opacity="0.28" stroke="#45d698" stroke-width="1.75" fill="none"/>
+  <!-- Pelota -->
+  <circle cx="90" cy="93" r="58" fill="url(#shine)" filter="url(#glow)"/>
+  <!-- Pentágono central (patrón clásico, legible en 16–32px) -->
+  <path
+    fill="#f7fffb"
+    fill-opacity=".96"
+    stroke="#065f46"
+    stroke-width="1.35"
+    stroke-linejoin="round"
+    d="M90 71 110.92 86.2 102.94 110.79 77.06 110.79 69.08 86.2z"
+  />
+  <!-- Aristas sutiles tipo panel -->
+  <g stroke="#0f6b54" stroke-width="1.6" stroke-linecap="round" fill="none" opacity=".75">
+    <path d="M90 71 l-15.3 11.05 M90 71 l15.3 11.05"/>
+    <path d="M76.95 111.2l-6.2-31.65"/>
+    <path d="M103.05 111.2l6.2-31.65"/>
+  </g>
 </svg>

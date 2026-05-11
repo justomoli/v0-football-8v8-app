@@ -1,33 +1,64 @@
 import type { Metadata, Viewport } from 'next'
-import { Geist, Geist_Mono } from 'next/font/google'
+import { JetBrains_Mono, Plus_Jakarta_Sans, Syne } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
 
-const geistSans = Geist({
+const plusJakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700", "800"],
-  variable: '--font-sans',
+  variable: '--font-jakarta',
   display: 'swap',
 })
 
-const geistMono = Geist_Mono({
+const syne = Syne({
+  subsets: ["latin"],
+  weight: ["600", "700", "800"],
+  variable: '--font-syne',
+  display: 'swap',
+})
+
+const jetBrainsMono = JetBrains_Mono({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
-  variable: '--font-mono',
+  variable: '--font-jetbrains',
   display: 'swap',
 })
 
 export const metadata: Metadata = {
-  title: 'Futbol 8 Manager',
-  description: 'Gestión de partidos de fútbol 8 — Equipos, estadísticas y temporadas',
+  metadataBase: new URL('https://v0-football-8v8-app.vercel.app'),
+  title: 'Fulbito SB5 - Jueves 20hs',
+  description:
+    'Resultados, estadísticas, goleadores, MVPs e historial del fulbito de los jueves entre los pibes.',
+
   generator: 'v0.app',
-  icons: {
-    icon: [
-      { url: '/icon-light-32x32.png', media: '(prefers-color-scheme: light)' },
-      { url: '/icon-dark-32x32.png',  media: '(prefers-color-scheme: dark)' },
-      { url: '/icon.svg', type: 'image/svg+xml' },
+
+  openGraph: {
+    title: 'Fulbito SB5 - Jueves 20hs',
+    description:
+      'Resultados, estadísticas, goleadores, MVPs e historial del fulbito de los jueves entre los pibes.',
+    url: 'https://v0-football-8v8-app.vercel.app',
+    siteName: 'Fulbito SB5',
+    images: [
+      {
+        url: '/fotolink.jpeg',
+        alt: 'Fulbito SB5',
+      },
     ],
-    apple: '/apple-icon.png',
+    locale: 'es_AR',
+    type: 'website',
+  },
+
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Fulbito SB5 - Jueves 20hs',
+    description:
+      'Donde se guarda la magia del fulbito de los jueves entre los pibes, resultados, mvp, puntajes, all in perris.',
+    images: ['/fotolink.jpeg'],
+  },
+
+  icons: {
+    icon: [{ url: '/icon.svg', type: 'image/svg+xml' }],
+    apple: [{ url: '/icon.svg', type: 'image/svg+xml' }],
   },
 }
 
@@ -43,8 +74,8 @@ export default function RootLayout({
   return (
     <html lang="es" className="dark bg-background">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-        style={{ fontFamily: 'var(--font-sans), system-ui, sans-serif' }}
+        className={`${plusJakarta.variable} ${syne.variable} ${jetBrainsMono.variable} antialiased`}
+        style={{ fontFamily: 'var(--font-jakarta), system-ui, sans-serif' }}
       >
         {children}
         {process.env.NODE_ENV === 'production' && <Analytics />}

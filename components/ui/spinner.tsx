@@ -1,4 +1,6 @@
-import { useId, type ComponentProps } from "react"
+"use client"
+
+import { useEffect, useId, useState, type ComponentProps } from "react"
 
 import { cn } from "@/lib/utils"
 
@@ -29,11 +31,11 @@ function Spinner({ className, logoSize, ...props }: SpinnerProps) {
     >
       <span
         aria-hidden
-        className="absolute inset-[-34%] rounded-full bg-primary/24 blur-md motion-safe:animate-[logoLoaderHalo_1.9s_ease-in-out_infinite]"
+        className="absolute inset-[-34%] rounded-full bg-primary/14 blur-md motion-safe:animate-[logoLoaderHalo_1.9s_ease-in-out_infinite]"
       />
       <svg
         viewBox="0 0 180 180"
-        className="relative h-full w-full drop-shadow-[0_0_14px_oklch(0.75_0.18_160/0.45)]"
+        className="relative h-full w-full drop-shadow-[0_0_12px_oklch(0.8_0.15_195/0.34)]"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
         aria-hidden
@@ -113,20 +115,41 @@ type LoadingStateProps = {
   message?: string
   className?: string
   spinnerClassName?: string
+  /**
+   * Si es mayor que 0, la pantalla solo aparece tras ese tiempo en milisegundos.
+   * Así las cargas muy cortas no muestran overlay. Usa 0 para mostrar al instante.
+   */
+  delayMs?: number
 }
 
-function LoadingState({ message = "Cargando", className, spinnerClassName }: LoadingStateProps) {
+function LoadingState({
+  message = "Cargando",
+  className,
+  spinnerClassName,
+  delayMs = 380,
+}: LoadingStateProps) {
+  const [visible, setVisible] = useState(delayMs <= 0)
+
+  useEffect(() => {
+    if (delayMs <= 0) return
+    const id = window.setTimeout(() => setVisible(true), delayMs)
+    return () => window.clearTimeout(id)
+  }, [delayMs])
+
+  if (!visible) return null
+
   return (
     <div
       className={cn(
-        "fixed inset-0 z-50 flex min-h-screen items-center justify-center overflow-hidden bg-background",
+        "fixed inset-0 z-50 flex min-h-screen items-center justify-center overflow-hidden bg-[oklch(0.055_0.016_260)]",
         className,
       )}
     >
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,oklch(0.75_0.18_160/0.13),transparent_34%),radial-gradient(circle_at_50%_62%,oklch(0.8_0.15_195/0.09),transparent_42%)]" />
-      <div className="pitch-grid absolute inset-0 opacity-[0.22]" />
-      <div className="relative z-10 grid -translate-y-8 place-items-center md:-translate-y-10">
-        <Spinner className={cn("h-36 w-36 md:h-40 md:w-40", spinnerClassName)} />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_78%_18%,oklch(0.8_0.15_195/0.12),transparent_34%),radial-gradient(circle_at_18%_82%,oklch(0.75_0.18_160/0.07),transparent_38%),linear-gradient(180deg,oklch(0.08_0.018_250/0.9),oklch(0.045_0.014_265))]" />
+      <div className="pitch-grid absolute inset-0 opacity-[0.08]" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_0%,transparent_30%,oklch(0.025_0.01_265/0.78)_100%)]" />
+      <div className="relative z-10 grid place-items-center">
+        <Spinner className={cn("h-[8.5rem] w-[8.5rem] md:h-40 md:w-40", spinnerClassName)} />
       </div>
       <span className="sr-only">{message}</span>
     </div>

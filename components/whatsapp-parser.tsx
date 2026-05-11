@@ -2,10 +2,9 @@
 
 import { useState, useEffect, useCallback } from "react"
 import {
-  getPlayers,
   parsePlayersFromText,
   createPlayer,
-  addAlias,
+  findPlayerByNameOrAlias,
   getCurrentMatchSetup,
   setConfirmedPlayers as dbSetConfirmedPlayers,
   getPlayerById,
@@ -13,24 +12,12 @@ import {
 import type { Player, ParsedPlayer } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { Input } from "@/components/ui/input"
-import { Slider } from "@/components/ui/slider"
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog"
-import {
+  AlertCircle,
   ClipboardPaste,
   Users,
-  UserPlus,
   Check,
-  Star,
   Trash2,
-  Tag,
   RefreshCw,
   Zap,
 } from "lucide-react"
@@ -41,19 +28,35 @@ interface WhatsAppParserProps {
   onPlayersConfirmed?: (playerIds: string[]) => void
 }
 
-/* ── Rating dot ─────────────────────────────────────── */
-function RatingDot({ rating }: { rating: number }) {
-  const color =
-    rating >= 8 ? "#22c55e" :
-    rating >= 6 ? "#06b6d4" :
-    rating >= 4 ? "#eab308" :
-                  "#ef4444"
-  return (
-    <span
-      className="inline-block h-2 w-2 rounded-full shrink-0"
-      style={{ background: color, boxShadow: `0 0 6px ${color}80` }}
-    />
-  )
+const PROCESSING_STEPS = ["Leyendo mensaje", "Reconociendo nombres", "Guardando jugadores"]
+
+function pluralize(count: number, singular: string, plural = `${singular}s`) {
+  return count === 1 ? singular : plural
+}
+
+function estimateInputNames(text: string) {
+  return text
+    .split(/[\n,;]/)
+    .map((line) =>
+      line
+        .trim()
+        .replace(/^(confirmados?|lista|jugadores|anotados|convocados)\s*:\s*/i, "")
+        .replace(/^[\s>*_~`-]+/g, "")
+        .replace(/^\d+\s*[\.\-\)\:]?\s*/g, "")
+        .replace(/^[•·◦▪▫✅☑✔➕➖-]\s*/gu, "")
+        .replace(/[\p{Extended_Pictographic}\uFE0F]/gu, " ")
+        .replace(/\s*\([^)]*\)\s*$/g, "")
+        .replace(/\s+/g, " ")
+        .trim(),
+    )
+    .filter((line) => {
+      const key = line
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .trim()
+      return key && !/\b(fut|futbol|jueves|hora|hs|20)\b/.test(key)
+    }).length
 }
 
 export function WhatsAppParser({ onPlayersConfirmed }: WhatsAppParserProps) {
@@ -63,12 +66,7 @@ export function WhatsAppParser({ onPlayersConfirmed }: WhatsAppParserProps) {
   const [confirmedPlayers, setConfirmedPlayers] = useState<Player[]>([])
   const [processing, setProcessing] = useState(false)
   const [loading, setLoading] = useState(true)
-
-  const [newPlayerDialog, setNewPlayerDialog] = useState(false)
-  const [pendingNewPlayers, setPendingNewPlayers] = useState<ParsedPlayer[]>([])
-  const [currentNewPlayer, setCurrentNewPlayer] = useState<{
-    name: string; rating: number; createAlias: boolean; originalName: string
-  }>({ name: "", rating: 5, createAlias: false, originalName: "" })
+  const [parserError, setParserError] = useState<string | null>(null)
 
   const loadMatchSetup = useCallback(async () => {
     setLoading(true)
@@ -85,60 +83,52 @@ export function WhatsAppParser({ onPlayersConfirmed }: WhatsAppParserProps) {
 
   useEffect(() => { loadMatchSetup() }, [loadMatchSetup])
 
+  const resolveParsedPlayer = async (parsed: ParsedPlayer): Promise<Player> => {
+    if (parsed.existingPlayer) return parsed.existingPlayer
+
+    try {
+      return await createPlayer(parsed.name, parsed.suggestedRating ?? 5)
+    } catch (error) {
+      // Another client may have created it between parse and insert.
+      const recovered = await findPlayerByNameOrAlias(parsed.name)
+      if (recovered.player) return recovered.player
+      throw error
+    }
+  }
+
   const parseWhatsAppList = async () => {
     if (!rawText.trim()) return
     setProcessing(true)
+    setParserError(null)
     try {
       const parsed = await parsePlayersFromText(rawText)
       setParsedPlayers(parsed)
-      const existing = parsed.filter(p => !p.isNew)
-      const newPlayers = parsed.filter(p => p.isNew)
-      const existingIds = existing
-        .map(p => p.existingPlayer?.id)
-        .filter((id): id is string => id !== undefined)
 
-      if (newPlayers.length > 0) {
-        setPendingNewPlayers(newPlayers)
-        setCurrentNewPlayer({ name: newPlayers[0].name, rating: 5, createAlias: false, originalName: newPlayers[0].name })
-        setNewPlayerDialog(true)
-      } else {
-        await dbSetConfirmedPlayers(existingIds)
-        setConfirmedPlayerIds(existingIds)
-        const details = await Promise.all(existingIds.map(id => getPlayerById(id)))
-        setConfirmedPlayers(details.filter((p): p is Player => p !== null))
-        onPlayersConfirmed?.(existingIds)
+      if (parsed.length === 0) {
+        await dbSetConfirmedPlayers([])
+        setConfirmedPlayerIds([])
+        setConfirmedPlayers([])
+        onPlayersConfirmed?.([])
+        setParserError("No encontré nombres válidos en esa lista.")
+        return
       }
-    } catch (e) { console.error(e) }
-    finally { setProcessing(false) }
-  }
 
-  const handleNewPlayerRating = async () => {
-    try {
-      const newPlayer = await createPlayer(currentNewPlayer.name, currentNewPlayer.rating)
-      if (currentNewPlayer.createAlias && currentNewPlayer.originalName !== currentNewPlayer.name)
-        await addAlias(newPlayer.id, currentNewPlayer.originalName)
+      const resolvedPlayers = await Promise.all(parsed.map(resolveParsedPlayer))
+      const uniquePlayers = resolvedPlayers.filter((player, index, list) =>
+        list.findIndex((p) => p.id === player.id) === index,
+      )
+      const confirmedIds = uniquePlayers.map((player) => player.id)
 
-      const remaining = pendingNewPlayers.slice(1)
-      setPendingNewPlayers(remaining)
-
-      if (remaining.length > 0) {
-        setCurrentNewPlayer({ name: remaining[0].name, rating: 5, createAlias: false, originalName: remaining[0].name })
-      } else {
-        setNewPlayerDialog(false)
-        const allPlayers = await getPlayers()
-        const confirmedIds = parsedPlayers
-          .map(p => p.existingPlayer
-            ? p.existingPlayer.id
-            : allPlayers.find(ap => ap.name.toLowerCase() === p.name.toLowerCase())?.id)
-          .filter((id): id is string => id !== undefined)
-
-        await dbSetConfirmedPlayers(confirmedIds)
-        setConfirmedPlayerIds(confirmedIds)
-        const details = await Promise.all(confirmedIds.map(id => getPlayerById(id)))
-        setConfirmedPlayers(details.filter((p): p is Player => p !== null))
-        onPlayersConfirmed?.(confirmedIds)
-      }
-    } catch (e) { console.error(e) }
+      await dbSetConfirmedPlayers(confirmedIds)
+      setConfirmedPlayerIds(confirmedIds)
+      setConfirmedPlayers(uniquePlayers)
+      onPlayersConfirmed?.(confirmedIds)
+    } catch (e) {
+      console.error(e)
+      setParserError("No pude procesar la lista. Revisá los nombres y probá de nuevo.")
+    } finally {
+      setProcessing(false)
+    }
   }
 
   const removePlayer = async (playerId: string) => {
@@ -163,7 +153,9 @@ export function WhatsAppParser({ onPlayersConfirmed }: WhatsAppParserProps) {
     return <LoadingState message="Cargando confirmados" />
   }
 
-  const lineCount = rawText.split(/[\n,]/).filter(x => x.trim()).length
+  const lineCount = estimateInputNames(rawText)
+  const createdCount = parsedPlayers.filter((p) => p.isNew).length
+  const recognizedCount = parsedPlayers.length - createdCount
 
   return (
     <div className="space-y-5">
@@ -190,15 +182,56 @@ export function WhatsAppParser({ onPlayersConfirmed }: WhatsAppParserProps) {
 
         {/* Textarea */}
         <Textarea
-          placeholder={"1 Messi\n2 Ronaldo\n3 Neymar\n…"}
+          placeholder={"1) kriko ✅\n2) justo\n3) nuevo pibe\n…"}
           value={rawText}
-          onChange={(e) => setRawText(e.target.value)}
+          onChange={(e) => {
+            setRawText(e.target.value)
+            setParsedPlayers([])
+            setParserError(null)
+          }}
           className={cn(
             "min-h-[110px] resize-none font-mono text-sm bg-black/20 border-border/30",
             "focus-visible:border-primary/50 focus-visible:ring-primary/20 transition-all duration-200",
             "placeholder:text-muted-foreground/40"
           )}
         />
+
+        {processing && (
+          <div
+            className="parser-processing mt-3 overflow-hidden rounded-2xl border border-primary/20 bg-black/25 p-3"
+            aria-live="polite"
+          >
+            <div className="parser-processing-scan" />
+            <div className="relative flex items-center justify-between gap-3">
+              {PROCESSING_STEPS.map((step, index) => (
+                <div key={step} className="parser-processing-step flex min-w-0 flex-1 items-center gap-2">
+                  <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full border border-primary/25 bg-primary/10 text-[10px] font-bold text-primary">
+                    {index + 1}
+                  </span>
+                  <span className="truncate text-[11px] font-semibold text-white/75">
+                    {step}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {parserError && (
+          <div className="mt-3 flex items-start gap-2 rounded-2xl border border-destructive/25 bg-destructive/10 p-3 text-sm text-destructive">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            <p>{parserError}</p>
+          </div>
+        )}
+
+        {!processing && parsedPlayers.length > 0 && !parserError && (
+          <div className="mt-3 rounded-2xl border border-primary/15 bg-primary/10 px-3 py-2 text-xs text-primary/90">
+            Lista procesada: {parsedPlayers.length} {pluralize(parsedPlayers.length, "jugador", "jugadores")}
+            {recognizedCount > 0 && `, ${recognizedCount} ${pluralize(recognizedCount, "reconocido")}`}
+            {createdCount > 0 && `, ${createdCount} ${pluralize(createdCount, "nuevo")} ${pluralize(createdCount, "guardado")} con media 5`}
+            .
+          </div>
+        )}
 
         {/* Button */}
         <Button
@@ -211,7 +244,7 @@ export function WhatsAppParser({ onPlayersConfirmed }: WhatsAppParserProps) {
           disabled={!rawText.trim() || processing}
         >
           {processing ? (
-            <><Spinner className="h-4 w-4" /> Procesando…</>
+            <><Spinner className="h-4 w-4" /> Procesando lista…</>
           ) : (
             <><Zap className="h-4 w-4" /> Procesar {lineCount > 0 ? `(${lineCount} nombres)` : "Lista"}</>
           )}
@@ -365,87 +398,6 @@ export function WhatsAppParser({ onPlayersConfirmed }: WhatsAppParserProps) {
           )}
         </div>
       )}
-
-      {/* ── New player dialog ── */}
-      <Dialog open={newPlayerDialog} onOpenChange={setNewPlayerDialog}>
-        <DialogContent className="glass-strong border-primary/20 sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <UserPlus className="h-5 w-5 text-primary" />
-              Jugador Nuevo Detectado
-            </DialogTitle>
-            <DialogDescription>
-              &quot;{currentNewPlayer.originalName}&quot; no está en la base de datos.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-5 py-4">
-            <div className="flex items-center justify-between rounded-xl bg-primary/10 border border-primary/20 p-4">
-              <span className="font-black text-lg" style={{ fontFamily: "var(--font-syne, Syne, sans-serif)" }}>
-                {currentNewPlayer.originalName}
-              </span>
-              <span className="text-xs font-semibold bg-secondary/60 rounded-full px-3 py-1 text-muted-foreground">
-                {pendingNewPlayers.length} pendiente{pendingNewPlayers.length !== 1 && "s"}
-              </span>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-semibold">Nombre a guardar</label>
-              <Input
-                value={currentNewPlayer.name}
-                onChange={(e) => {
-                  const n = e.target.value
-                  setCurrentNewPlayer(prev => ({ ...prev, name: n, createAlias: n !== prev.originalName }))
-                }}
-                className="bg-secondary/40 border-border/40 focus-visible:border-primary/50"
-                placeholder="Nombre completo…"
-              />
-              {currentNewPlayer.name !== currentNewPlayer.originalName && (
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <Tag className="h-3 w-3 text-primary" />
-                  Alias: &quot;{currentNewPlayer.originalName}&quot; → &quot;{currentNewPlayer.name}&quot;
-                </div>
-              )}
-            </div>
-
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-semibold">Puntaje inicial</label>
-                <div className="flex items-center gap-1.5">
-                  <Star className="h-3.5 w-3.5 fill-primary text-primary" />
-                  <span
-                    className="font-black text-primary text-lg w-8 text-center"
-                    style={{ fontFamily: "var(--font-syne, Syne, sans-serif)" }}
-                  >
-                    {currentNewPlayer.rating}
-                  </span>
-                </div>
-              </div>
-              <Slider
-                value={[currentNewPlayer.rating]}
-                onValueChange={([v]) => setCurrentNewPlayer(prev => ({ ...prev, rating: v }))}
-                min={1} max={10} step={0.5}
-                className="[&_[role=slider]]:shadow-[0_0_12px_oklch(0.75_0.18_160/0.6)]"
-              />
-              <div className="flex justify-between text-[10px] text-muted-foreground">
-                <span>Principiante</span>
-                <span>Intermedio</span>
-                <span>Crack ⚡</span>
-              </div>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button
-              onClick={handleNewPlayerRating}
-              className="w-full font-bold gap-2 shadow-[0_0_20px_oklch(0.75_0.18_160/0.3)]"
-            >
-              <UserPlus className="h-4 w-4" />
-              {pendingNewPlayers.length > 1 ? "Siguiente Jugador →" : "Confirmar y Continuar"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

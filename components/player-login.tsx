@@ -1,56 +1,32 @@
 "use client"
 
 import { useState } from "react"
-import { useAuth, usePlayersList } from "@/lib/auth-context"
+import { useAuth } from "@/lib/auth-context"
 import { Button } from "@/components/ui/button"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { LogIn, User, Shield, Star, Trophy, Target, LogOut } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Flame, LogIn, LogOut, Shield } from "lucide-react"
 import { LoadingState, Spinner } from "@/components/ui/spinner"
 
-/* ── Rating bar ───────────────────────────────────────── */
-function RatingBar({ value }: { value: number }) {
-  const pct = Math.min(100, (value / 10) * 100)
-  const color =
-    value >= 8 ? "oklch(0.75 0.18 160)" :
-    value >= 6 ? "oklch(0.8 0.15 195)" :
-    value >= 4 ? "oklch(0.8 0.15 80)" :
-                 "oklch(0.6 0.2 25)"
-  return (
-    <div className="h-1 w-24 overflow-hidden rounded-full bg-white/10">
-      <div
-        className="h-full rounded-full rating-bar-fill"
-        style={{
-          width: `${pct}%`,
-          background: `linear-gradient(90deg, ${color}, ${color}cc)`,
-          boxShadow: `0 0 8px ${color}80`,
-          "--rating-w": `${pct}%`,
-        } as React.CSSProperties}
-      />
-    </div>
-  )
-}
-
-/* ── Stat chip ────────────────────────────────────────── */
-function StatChip({ icon: Icon, value, label }: { icon: React.ElementType; value: string | number; label: string }) {
-  return (
-    <div className="flex flex-col items-center gap-0.5 rounded-xl bg-white/5 border border-white/8 px-3 py-2 min-w-[60px]">
-      <Icon className="h-3.5 w-3.5 text-muted-foreground mb-0.5" />
-      <span className="text-sm font-bold text-foreground">{value}</span>
-      <span className="text-[9px] text-muted-foreground uppercase tracking-wider">{label}</span>
-    </div>
-  )
-}
+const ROAST_NAMES = [
+  "pecho frío",
+  "fantasma táctico",
+  "suplente emocional",
+  "cono con botines",
+  "9 de área chica",
+  "líder del banco",
+]
 
 export function PlayerLogin() {
-  const { login, player, logout, isLoading: authLoading } = useAuth()
-  const { players, loading: playersLoading } = usePlayersList()
-  const [selectedPlayerId, setSelectedPlayerId] = useState<string>("")
+  const { loginGeneral, player, logout, isLoading: authLoading } = useAuth()
+  const [displayName, setDisplayName] = useState("")
   const [isLoggingIn, setIsLoggingIn] = useState(false)
 
   const handleLogin = async () => {
-    if (!selectedPlayerId) return
     setIsLoggingIn(true)
-    try { await login(selectedPlayerId) }
+    try {
+      const fallback = ROAST_NAMES[Math.floor(Math.random() * ROAST_NAMES.length)]
+      await loginGeneral(displayName || fallback)
+    }
     catch { /* handled in context */ }
     finally { setIsLoggingIn(false) }
   }
@@ -65,7 +41,6 @@ export function PlayerLogin() {
     return (
       <div className="glass rounded-2xl p-4 anim-scale-in neon-border">
         <div className="flex items-center gap-4">
-          {/* Avatar */}
           <div className="relative shrink-0">
             <div
               className="h-14 w-14 rounded-2xl flex items-center justify-center text-primary-foreground font-semibold text-[22px]"
@@ -78,41 +53,25 @@ export function PlayerLogin() {
             >
               {player.name.charAt(0).toUpperCase()}
             </div>
-            {player.is_admin && (
-              <div className="absolute -bottom-1 -right-1 h-5 w-5 rounded-full bg-primary flex items-center justify-center shadow-lg">
-                <Shield className="h-3 w-3 text-primary-foreground" />
-              </div>
-            )}
+            <div className="absolute -bottom-1 -right-1 h-5 w-5 rounded-full bg-primary flex items-center justify-center shadow-lg">
+              <Shield className="h-3 w-3 text-primary-foreground" />
+            </div>
           </div>
 
-          {/* Info */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
               <h2 className="font-semibold text-[17px] leading-tight truncate tracking-tight">
                 {player.name}
               </h2>
-              {player.is_admin && (
-                <span className="text-[9px] font-bold tracking-widest uppercase px-1.5 py-0.5 rounded-md bg-primary/20 text-primary border border-primary/30">
-                  Admin
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              <Star className="h-3 w-3 fill-primary text-primary" />
-              <span
-                className="text-[13px] font-semibold text-primary tabular-nums"
-                style={{
-                  fontFamily: "var(--font-mono), ui-monospace, monospace",
-                  letterSpacing: "-0.03em",
-                }}
-              >
-                {player.dynamic_rating.toFixed(1)}
+              <span className="text-[9px] font-bold tracking-widest uppercase px-1.5 py-0.5 rounded-md bg-primary/20 text-primary border border-primary/30">
+                Admin
               </span>
-              <RatingBar value={player.dynamic_rating} />
             </div>
+            <p className="text-xs text-muted-foreground">
+              Acceso general habilitado. Hoy se edita sin llorar.
+            </p>
           </div>
 
-          {/* Logout */}
           <button
             onClick={logout}
             className="shrink-0 flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-medium
@@ -122,23 +81,16 @@ export function PlayerLogin() {
             <LogOut className="h-3.5 w-3.5" />
           </button>
         </div>
-
-        {/* Stats row */}
-        <div className="mt-3 flex gap-2 justify-center">
-          <StatChip icon={Trophy}  value={player.total_matches} label="Partidos" />
-          <StatChip icon={Target}  value={player.total_goals}   label="Goles" />
-          <StatChip icon={Star}    value={player.motm_count}     label="MOTM" />
-          <StatChip icon={User}    value={player.dynamic_rating.toFixed(1)} label="Rating" />
-        </div>
       </div>
     )
   }
 
   /* ── Login form ── */
   return (
-    <div className="glass rounded-2xl p-6 anim-fade-up">
+    <div className="glass-strong relative overflow-hidden rounded-[1.75rem] p-6 anim-fade-up">
+      <div className="pointer-events-none absolute -right-20 -top-20 h-52 w-52 rounded-full bg-primary/15 blur-3xl" />
       {/* Header */}
-      <div className="mb-5 text-center">
+      <div className="relative mb-5 text-center">
         <div
           className="mx-auto mb-3 h-14 w-14 rounded-2xl flex items-center justify-center"
           style={{
@@ -147,64 +99,41 @@ export function PlayerLogin() {
             boxShadow: "0 0 20px oklch(0.75 0.18 160 / 0.2)",
           }}
         >
-          <LogIn className="h-6 w-6 text-primary" />
+          <Flame className="h-6 w-6 text-primary" />
         </div>
-        <h2 className="text-[17px] font-semibold tracking-tight">
-          Iniciar sesión
+        <h2 className="font-display text-[26px] font-extrabold leading-none tracking-[-0.06em]">
+          Entrar a FUTJUEVES
         </h2>
-        <p className="text-xs text-muted-foreground mt-1">
-          Seleccioná tu nombre para entrar
+        <p className="eyebrow-sub mx-auto mt-2 max-w-[18rem]">
+          Un solo acceso general. Sin ratings visibles, sin excusas, sin VAR.
         </p>
       </div>
 
-      {/* Select */}
-      <div className="space-y-3">
-        <Select
-          value={selectedPlayerId}
-          onValueChange={setSelectedPlayerId}
-          disabled={playersLoading}
-        >
-          <SelectTrigger
-            className="w-full border-border/50 bg-secondary/40 backdrop-blur-sm
-              focus:border-primary/50 focus:ring-primary/30 transition-all duration-200
-              hover:border-border"
-          >
-            <SelectValue
-              placeholder={playersLoading ? "Cargando jugadores…" : "Seleccioná tu nombre"}
-            />
-          </SelectTrigger>
-          <SelectContent className="glass-strong border-border/30">
-            {players.map((p) => (
-              <SelectItem key={p.id} value={p.id} className="focus:bg-primary/10">
-                <div className="flex items-center gap-2">
-                  {p.is_admin && <Shield className="h-3 w-3 text-primary" />}
-                  <span className="font-medium">{p.name}</span>
-                  <span className="ml-auto text-muted-foreground text-xs">
-                    ★ {p.dynamic_rating.toFixed(1)}
-                  </span>
-                </div>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <div className="relative space-y-3">
+        <Input
+          value={displayName}
+          onChange={(event) => setDisplayName(event.target.value)}
+          onKeyDown={(event) => event.key === "Enter" && handleLogin()}
+          placeholder="Poné tu apodo (opcional)"
+          className="h-12 rounded-2xl border-white/[0.1] bg-black/25 text-center text-[15px] placeholder:text-muted-foreground/55 focus-visible:border-primary/40 focus-visible:ring-primary/30"
+        />
 
         <Button
           onClick={handleLogin}
-          disabled={!selectedPlayerId || isLoggingIn}
-          className="w-full gap-2 font-bold tracking-wide transition-all duration-200
+          disabled={isLoggingIn}
+          className="h-12 w-full gap-2 rounded-2xl font-bold tracking-wide transition-all duration-200
             shadow-[0_0_20px_oklch(0.75_0.18_160/0.0)] hover:shadow-[0_0_20px_oklch(0.75_0.18_160/0.4)]
             disabled:opacity-50"
-          style={{ fontFamily: "var(--font-outfit, Outfit, sans-serif)" }}
         >
           {isLoggingIn ? (
             <><Spinner className="h-4 w-4" /> Ingresando…</>
           ) : (
-            <><LogIn className="h-4 w-4" /> Ingresar</>
+            <><LogIn className="h-4 w-4" /> Entrar como usuario general</>
           )}
         </Button>
 
         <p className="text-center text-[11px] text-muted-foreground">
-          Sin contraseña — solo elegí tu nombre
+          Si no ponés apodo, el vestuario elige por vos.
         </p>
       </div>
     </div>

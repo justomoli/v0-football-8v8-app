@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import {
   getCurrentMatchSetup,
   getPlayerById,
@@ -16,10 +16,12 @@ import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Slider } from "@/components/ui/slider"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Trophy, Target, Star, Save, Sparkles, AlertCircle, Award, CheckCircle2, Copy, MessageCircle, RotateCcw } from "lucide-react"
+import { Trophy, Target, Star, Save, Sparkles, AlertCircle, Award, CheckCircle2, Copy, MessageCircle, RotateCcw, Download } from "lucide-react"
+import { toPng } from "html-to-image"
 import { cn } from "@/lib/utils"
 import { LoadingState, Spinner } from "@/components/ui/spinner"
 import { buildMatchMessage } from "@/lib/match-message"
+import { MatchShareCard, type MatchSharePlayerLine } from "@/components/match-share-card"
 
 interface PlayerMatchInput {
   playerId: string
@@ -404,8 +406,10 @@ function SuperclasicoStamp() {
 
 /* ── Main component ──────────────────────────────────── */
 export function PostMatch() {
+  const shareCardRef = useRef<HTMLDivElement>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [pdfDownloading, setPdfDownloading] = useState(false)
   const [setup, setSetup] = useState<CurrentMatchSetup | null>(null)
   const [whiteTeamPlayers, setWhiteTeamPlayers] = useState<Player[]>([])
   const [blackTeamPlayers, setBlackTeamPlayers] = useState<Player[]>([])
@@ -532,6 +536,42 @@ export function PostMatch() {
     }
   }
 
+  const handleDownloadPdf = async () => {
+    if (!shareCardRef.current || !savedMatch) return
+    setPdfDownloading(true)
+    try {
+      const dataUrl = await toPng(shareCardRef.current, {
+        quality: 1,
+        pixelRatio: 2,
+        backgroundColor: "#07100d",
+        cacheBust: true,
+      })
+      const { jsPDF } = (await import("jspdf/dist/jspdf.es.min.js")) as typeof import("jspdf")
+      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" })
+      const pageWidth = pdf.internal.pageSize.getWidth()
+      const pageHeight = pdf.internal.pageSize.getHeight()
+      const margin = 10
+      const image = pdf.getImageProperties(dataUrl)
+      const ratio = image.width / image.height
+
+      let imageWidth = pageWidth - margin * 2
+      let imageHeight = imageWidth / ratio
+      if (imageHeight > pageHeight - margin * 2) {
+        imageHeight = pageHeight - margin * 2
+        imageWidth = imageHeight * ratio
+      }
+
+      const x = (pageWidth - imageWidth) / 2
+      const y = (pageHeight - imageHeight) / 2
+      pdf.addImage(dataUrl, "PNG", x, y, imageWidth, imageHeight)
+      pdf.save(`partido-futjueves-${savedMatch.date.split("T")[0]}.pdf`)
+    } catch (e) {
+      console.error("PDF generation failed:", e)
+    } finally {
+      setPdfDownloading(false)
+    }
+  }
+
   const handleNewMatch = () => {
     setWhiteScore(0)
     setBlackScore(0)
@@ -552,7 +592,19 @@ export function PostMatch() {
     <LoadingState message="Cargando partido" />
   )
 
-  if (saved && savedMatch) return (
+  if (saved && savedMatch) {
+    const savedWhiteTeam: MatchSharePlayerLine[] = whiteTeamPlayers.map((p) => ({
+      player: p,
+      goals: getPlayerInput(p.id).goals,
+      rating: getPlayerInput(p.id).rating,
+    }))
+    const savedBlackTeam: MatchSharePlayerLine[] = blackTeamPlayers.map((p) => ({
+      player: p,
+      goals: getPlayerInput(p.id).goals,
+      rating: getPlayerInput(p.id).rating,
+    }))
+
+    return (
     <div className="space-y-5">
       {/* Confirmation card */}
       <div className="glass rounded-2xl p-6 anim-scale-in neon-border">
@@ -690,6 +742,25 @@ export function PostMatch() {
         </Button>
 
         <Button
+          onClick={handleDownloadPdf}
+          variant="outline"
+          disabled={pdfDownloading}
+          className="w-full gap-2 border-primary/30 bg-primary/5 hover:bg-primary/10"
+        >
+          {pdfDownloading ? (
+            <>
+              <Spinner className="h-4 w-4" />
+              Generando PDF…
+            </>
+          ) : (
+            <>
+              <Download className="h-4 w-4" />
+              Descargar PDF prolijo
+            </>
+          )}
+        </Button>
+
+        <Button
           onClick={handleNewMatch}
           variant="outline"
           className="w-full gap-2 border-border/40 hover:bg-white/5"
@@ -698,6 +769,25 @@ export function PostMatch() {
           Nuevo partido
         </Button>
       </div>
+
+      <details className="glass rounded-2xl px-4 py-3 group" open>
+        <summary className="cursor-pointer flex items-center justify-between text-[12px] font-medium text-muted-foreground/75 hover:text-foreground transition-colors">
+          <span className="flex items-center gap-2">
+            <Trophy className="h-3 w-3" />
+            Preview del PDF
+          </span>
+          <span className="text-[10px] opacity-50 group-open:rotate-180 transition-transform">▼</span>
+        </summary>
+        <div className="mt-3 overflow-x-auto rounded-2xl">
+          <MatchShareCard
+            ref={shareCardRef}
+            match={savedMatch}
+            whiteTeam={savedWhiteTeam}
+            blackTeam={savedBlackTeam}
+            motmPlayer={savedMotm}
+          />
+        </div>
+      </details>
 
       {/* Message preview (collapsed) */}
       {savedMessage && (
@@ -718,7 +808,8 @@ export function PostMatch() {
         </details>
       )}
     </div>
-  )
+    )
+  }
 
   if (!hasTeams) return (
     <div className="rounded-2xl border border-yellow-500/20 bg-yellow-500/8 p-8 text-center anim-fade-up">

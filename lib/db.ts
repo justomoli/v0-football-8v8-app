@@ -120,8 +120,72 @@ export async function deleteAlias(id: string): Promise<void> {
 
 // ==================== NAME NORMALIZATION ====================
 
+export function normalizePlayerKey(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/['’`´]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function cleanWhatsappPlayerLine(line: string): string {
+  return line
+    .replace(/\r/g, '')
+    .replace(/https?:\/\/\S+/gi, '')
+    .replace(/^(confirmados?|lista|jugadores|anotados|convocados)\s*:\s*/i, '')
+    .replace(/^[\s>*_~`-]+/g, '')
+    .replace(/^\d+\s*[\.\-\)\:]?\s*/g, '')
+    .replace(/^[•·◦▪▫✅☑✔➕➖-]\s*/gu, '')
+    .replace(/[\p{Extended_Pictographic}\uFE0F]/gu, ' ')
+    .replace(/\s*\([^)]*\)\s*$/g, '')
+    .replace(/\s+(confirmad[oa]|ok|voy|va|presente|juega)\s*$/i, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function isIgnoredWhatsappLine(line: string): boolean {
+  const key = normalizePlayerKey(line.replace(/:$/, ''))
+  if (!key || /^[=\-_\s]+$/.test(line)) return true
+  if (/\b(fut|futbol|jueves|hora|hs|20)\b/.test(key)) return true
+
+  return [
+    'confirmados',
+    'lista',
+    'lista de confirmados',
+    'jueves',
+    'futbol',
+    'futbol 8',
+    'futbol ocho',
+    'equipo',
+    'equipos',
+    'jugadores',
+    'anotados',
+    'convocados',
+  ].includes(key)
+}
+
+function findPlayerInCollections(
+  name: string,
+  players: Player[],
+  aliases: PlayerAlias[],
+): { player: Player | null; alias: PlayerAlias | null } {
+  const key = normalizePlayerKey(name)
+  const player = players.find((p) => normalizePlayerKey(p.name) === key)
+  if (player) return { player, alias: null }
+
+  const alias = aliases.find((a) => normalizePlayerKey(a.alias) === key)
+  if (!alias) return { player: null, alias: null }
+
+  return {
+    player: players.find((p) => p.id === alias.player_id) ?? null,
+    alias,
+  }
+}
+
 export async function findPlayerByNameOrAlias(name: string): Promise<{ player: Player | null, alias: PlayerAlias | null }> {
-  const normalizedName = name.toLowerCase().trim()
+  const normalizedName = name.trim()
   
   // First check exact match on player name
   const { data: playerMatch } = await supabase
@@ -147,21 +211,30 @@ export async function findPlayerByNameOrAlias(name: string): Promise<{ player: P
       alias: { id: aliasMatch.id, player_id: aliasMatch.player_id, alias: aliasMatch.alias, created_at: aliasMatch.created_at }
     }
   }
+
+  const [players, aliases] = await Promise.all([getPlayers(), getAliases()])
+  const fallbackMatch = findPlayerInCollections(name, players, aliases)
+  if (fallbackMatch.player) return fallbackMatch
   
   return { player: null, alias: null }
 }
 
 export async function parsePlayersFromText(text: string): Promise<ParsedPlayer[]> {
-  // Parse different formats: "1. Name", "1 Name", "Name", comma-separated, line-separated
-  const lines = text.split(/[\n,]+/).map(l => l.trim()).filter(Boolean)
+  // Parse common WhatsApp formats: numbered lists, bullets, checks, commas and line breaks.
+  const lines = text.split(/[\n,;]+/).map(l => l.trim()).filter(Boolean)
+  const [players, aliases] = await Promise.all([getPlayers(), getAliases()])
   const parsed: ParsedPlayer[] = []
+  const seen = new Set<string>()
   
   for (const line of lines) {
-    // Remove numbering like "1.", "1 ", "1-", etc.
-    const name = line.replace(/^\d+[\.\-\)\s]+/, '').trim()
-    if (!name) continue
+    const name = cleanWhatsappPlayerLine(line)
+    if (!name || isIgnoredWhatsappLine(name)) continue
+
+    const key = normalizePlayerKey(name)
+    if (!key || seen.has(key)) continue
+    seen.add(key)
     
-    const { player, alias } = await findPlayerByNameOrAlias(name)
+    const { player, alias } = findPlayerInCollections(name, players, aliases)
     
     parsed.push({
       name,

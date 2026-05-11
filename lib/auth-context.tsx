@@ -5,9 +5,28 @@ import type { Player, AuthContext as AuthContextType } from "@/lib/types"
 import { getSessionPlayer, createSession, deleteSession, getPlayers } from "@/lib/db"
 
 const AUTH_TOKEN_KEY = 'futbol8_session'
+const GENERAL_SESSION_KEY = 'futjueves_general_session'
+
+function createGeneralPlayer(name = "pecho frío"): Player {
+  const now = new Date().toISOString()
+
+  return {
+    id: "general-user",
+    name,
+    dynamic_rating: 5,
+    total_goals: 0,
+    total_matches: 0,
+    motm_count: 0,
+    is_admin: true,
+    is_goalkeeper: false,
+    created_at: now,
+    updated_at: now,
+  }
+}
 
 const AuthContext = createContext<AuthContextType & {
   login: (playerId: string) => Promise<void>
+  loginGeneral: (displayName?: string) => Promise<void>
   logout: () => Promise<void>
   refreshPlayer: () => Promise<void>
 }>({
@@ -15,6 +34,7 @@ const AuthContext = createContext<AuthContextType & {
   isAdmin: false,
   isLoading: true,
   login: async () => {},
+  loginGeneral: async () => {},
   logout: async () => {},
   refreshPlayer: async () => {},
 })
@@ -25,6 +45,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loadSession = useCallback(async () => {
     try {
+      const generalName = localStorage.getItem(GENERAL_SESSION_KEY)
+      if (generalName) {
+        setPlayer(createGeneralPlayer(generalName))
+        return
+      }
+
       const token = localStorage.getItem(AUTH_TOKEN_KEY)
       if (!token) {
         setPlayer(null)
@@ -52,12 +78,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (playerId: string) => {
     try {
       const token = await createSession(playerId)
+      localStorage.removeItem(GENERAL_SESSION_KEY)
       localStorage.setItem(AUTH_TOKEN_KEY, token)
       await loadSession()
     } catch (error) {
       console.error('Login failed:', error)
       throw error
     }
+  }
+
+  const loginGeneral = async (displayName?: string) => {
+    const name = displayName?.trim() || "pecho frío"
+    localStorage.removeItem(AUTH_TOKEN_KEY)
+    localStorage.setItem(GENERAL_SESSION_KEY, name)
+    setPlayer(createGeneralPlayer(name))
   }
 
   const logout = async () => {
@@ -67,6 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await deleteSession(token)
         localStorage.removeItem(AUTH_TOKEN_KEY)
       }
+      localStorage.removeItem(GENERAL_SESSION_KEY)
       setPlayer(null)
     } catch (error) {
       console.error('Logout failed:', error)
@@ -83,6 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAdmin: player?.is_admin ?? false,
       isLoading,
       login,
+      loginGeneral,
       logout,
       refreshPlayer,
     }}>

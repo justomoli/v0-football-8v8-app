@@ -1,12 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog"
+import { Dialog, DialogClose, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import type { Player } from "@/lib/types"
 import { getPhotoUrl } from "@/lib/player-photo"
 import { Hand, Shield, Trophy, Target, Award, Star } from "lucide-react"
@@ -18,11 +13,10 @@ interface PlayerFifaCardProps {
   onClose: () => void
 }
 
-/* ── Card tier visual treatment ── */
+/* ── Card visual theme ── */
 function getCardTheme(rating: number) {
   if (rating >= 9) {
     return {
-      tier: "Icon",
       bg: "linear-gradient(160deg, #2a1d0a 0%, #1a1206 45%, #0c0904 100%)",
       border: "oklch(0.85 0.18 80)",
       accent: "oklch(0.92 0.14 95)",
@@ -32,7 +26,6 @@ function getCardTheme(rating: number) {
   }
   if (rating >= 8) {
     return {
-      tier: "Crack",
       bg: "linear-gradient(160deg, #0a1f15 0%, #06150e 50%, #030a07 100%)",
       border: "oklch(0.78 0.22 145)",
       accent: "oklch(0.78 0.22 145)",
@@ -42,7 +35,6 @@ function getCardTheme(rating: number) {
   }
   if (rating >= 7) {
     return {
-      tier: "Bueno",
       bg: "linear-gradient(160deg, #0a1822 0%, #06121a 50%, #030810 100%)",
       border: "oklch(0.78 0.15 195)",
       accent: "oklch(0.85 0.15 200)",
@@ -52,7 +44,6 @@ function getCardTheme(rating: number) {
   }
   if (rating >= 5) {
     return {
-      tier: "Estándar",
       bg: "linear-gradient(160deg, #1c1808 0%, #110e05 50%, #080603 100%)",
       border: "oklch(0.78 0.14 85)",
       accent: "oklch(0.88 0.16 90)",
@@ -61,7 +52,6 @@ function getCardTheme(rating: number) {
     }
   }
   return {
-    tier: "Refuerzo",
     bg: "linear-gradient(160deg, #1a1218 0%, #100a10 50%, #080508 100%)",
     border: "oklch(0.55 0.04 270)",
     accent: "oklch(0.7 0.04 270)",
@@ -109,13 +99,18 @@ export function PlayerFifaCard({ player, open, onClose }: PlayerFifaCardProps) {
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent
-        className="border-0 p-0 overflow-hidden max-w-[340px] bg-transparent shadow-none"
+        showCloseButton={false}
+        aria-describedby={undefined}
+        className="border-0 p-4 overflow-visible max-w-[390px] bg-transparent shadow-none"
         style={{ background: "transparent" }}
       >
-        <DialogTitle className="sr-only">{player.name}</DialogTitle>
-        <DialogDescription className="sr-only">
-          Carta de jugador con rating, posición y estadísticas
-        </DialogDescription>
+        <DialogTitle className="sr-only">Carta de jugador: {player.name}</DialogTitle>
+        <DialogClose
+          type="button"
+          className="absolute right-0 top-0 z-30 flex h-10 w-10 -translate-y-2 translate-x-2 items-center justify-center rounded-2xl border border-white/15 bg-black/65 text-white/80 shadow-[0_0_24px_rgba(0,0,0,0.45)] backdrop-blur-md transition-all hover:scale-105 hover:text-white focus:outline-none focus:ring-2 focus:ring-primary/60"
+        >
+          ×
+        </DialogClose>
 
         {/* Card body */}
         <div
@@ -150,16 +145,6 @@ export function PlayerFifaCard({ player, open, onClose }: PlayerFifaCardProps) {
             >
               {positionLabel}
             </span>
-            <span
-              className="text-[8px] uppercase opacity-60"
-              style={{
-                fontFamily: "var(--font-mono), ui-monospace, monospace",
-                color: theme.accent,
-                letterSpacing: "0.2em",
-              }}
-            >
-              {theme.tier}
-            </span>
           </div>
 
           {/* Admin / GK badges top-right */}
@@ -171,7 +156,6 @@ export function PlayerFifaCard({ player, open, onClose }: PlayerFifaCardProps) {
                   background: "rgba(255,255,255,0.08)",
                   border: "1px solid rgba(255,255,255,0.15)",
                 }}
-                title="Admin"
               >
                 <Shield className="h-3 w-3" style={{ color: theme.accent }} />
               </span>
@@ -183,7 +167,6 @@ export function PlayerFifaCard({ player, open, onClose }: PlayerFifaCardProps) {
                   background: "oklch(0.85 0.16 85 / 0.18)",
                   border: "1px solid oklch(0.85 0.16 85 / 0.4)",
                 }}
-                title="Arquero"
               >
                 <Hand className="h-3 w-3" style={{ color: "oklch(0.92 0.14 90)" }} />
               </span>
@@ -204,7 +187,7 @@ export function PlayerFifaCard({ player, open, onClose }: PlayerFifaCardProps) {
                 /* eslint-disable-next-line @next/next/no-img-element */
                 <img
                   src={photoUrl}
-                  alt={player.name}
+                  alt=""
                   className="h-full w-full object-cover"
                   onError={() => setPhotoError(true)}
                 />
@@ -227,6 +210,7 @@ export function PlayerFifaCard({ player, open, onClose }: PlayerFifaCardProps) {
           {/* Name + nickname */}
           <div className="px-6 text-center mt-2">
             <h2
+              id="fifa-card-name"
               className="text-[22px] font-semibold leading-tight tracking-tight uppercase"
               style={{
                 letterSpacing: "-0.02em",
@@ -254,13 +238,13 @@ export function PlayerFifaCard({ player, open, onClose }: PlayerFifaCardProps) {
           />
 
           {/* Stats grid 3×2 */}
-          <div className="px-6 grid grid-cols-3 gap-y-3 gap-x-4">
-            <StatItem label="TIR" value={stats.shot} color={theme.accent} />
-            <StatItem label="PAS" value={stats.passing} color={theme.accent} />
-            <StatItem label="REG" value={stats.dribbling} color={theme.accent} />
-            <StatItem label="RIT" value={stats.pace} color={theme.accent} />
-            <StatItem label="DEF" value={stats.defense} color={theme.accent} />
-            <StatItem label="FIS" value={stats.physique} color={theme.accent} />
+          <div className="px-6 grid grid-cols-3 gap-y-3 gap-x-4 place-items-center">
+            <StatItem value={stats.shot} color={theme.accent} />
+            <StatItem value={stats.passing} color={theme.accent} />
+            <StatItem value={stats.dribbling} color={theme.accent} />
+            <StatItem value={stats.pace} color={theme.accent} />
+            <StatItem value={stats.defense} color={theme.accent} />
+            <StatItem value={stats.physique} color={theme.accent} />
           </div>
 
           {/* Footer: physical + season */}
@@ -285,10 +269,10 @@ export function PlayerFifaCard({ player, open, onClose }: PlayerFifaCardProps) {
             )}
 
             <div className="flex items-center justify-around mt-1">
-              <SeasonStat icon={Trophy} value={player.total_matches} label="PJ" color={theme.accent} />
-              <SeasonStat icon={Target} value={player.total_goals} label="G" color={theme.accent} />
-              <SeasonStat icon={Award} value={player.motm_count} label="MOTM" color={theme.accent} />
-              <SeasonStat icon={Star} value={player.dynamic_rating.toFixed(1)} label="AVG" color={theme.accent} />
+              <SeasonStat icon={Trophy} value={player.total_matches} color={theme.accent} />
+              <SeasonStat icon={Target} value={player.total_goals} color={theme.accent} />
+              <SeasonStat icon={Award} value={player.motm_count} color={theme.accent} />
+              <SeasonStat icon={Star} value={player.dynamic_rating.toFixed(1)} color={theme.accent} />
             </div>
           </div>
 
@@ -314,42 +298,28 @@ export function PlayerFifaCard({ player, open, onClose }: PlayerFifaCardProps) {
   )
 }
 
-function StatItem({ label, value, color }: { label: string; value: number; color: string }) {
+function StatItem({ value, color }: { value: number; color: string }) {
   return (
-    <div className="flex items-baseline gap-1.5">
-      <span
-        className="text-[18px] font-semibold leading-none tabular-nums w-[34px]"
-        style={{
-          fontFamily: "var(--font-mono), ui-monospace, monospace",
-          color,
-          letterSpacing: "-0.04em",
-        }}
-      >
-        {value}
-      </span>
-      <span
-        className="text-[10px] uppercase opacity-65"
-        style={{
-          fontFamily: "var(--font-mono), ui-monospace, monospace",
-          letterSpacing: "0.14em",
-          color,
-        }}
-      >
-        {label}
-      </span>
-    </div>
+    <span
+      className="text-[18px] font-semibold leading-none tabular-nums"
+      style={{
+        fontFamily: "var(--font-mono), ui-monospace, monospace",
+        color,
+        letterSpacing: "-0.04em",
+      }}
+    >
+      {value}
+    </span>
   )
 }
 
 function SeasonStat({
   icon: Icon,
   value,
-  label,
   color,
 }: {
   icon: React.ElementType
   value: number | string
-  label: string
   color: string
 }) {
   return (
@@ -364,16 +334,6 @@ function SeasonStat({
         }}
       >
         {value}
-      </span>
-      <span
-        className="text-[8px] uppercase opacity-55 mt-1"
-        style={{
-          fontFamily: "var(--font-mono), ui-monospace, monospace",
-          letterSpacing: "0.14em",
-          color,
-        }}
-      >
-        {label}
       </span>
     </div>
   )

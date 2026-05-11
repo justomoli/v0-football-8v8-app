@@ -44,9 +44,12 @@
   --neon-cyan: oklch(0.8 0.15 195);
 
   /* Glass tokens */
-  --glass-bg: oklch(0.16 0.018 260 / 0.5);
-  --glass-border: oklch(0.75 0.18 160 / 0.14);
-  --glass-shadow: 0 8px 40px oklch(0 0 0 / 0.55), inset 0 1px 0 oklch(1 0 0 / 0.06);
+  --glass-bg: oklch(0.15 0.018 260 / 0.56);
+  --glass-border: oklch(0.75 0.18 160 / 0.18);
+  --glass-shadow:
+    0 18px 60px oklch(0 0 0 / 0.56),
+    0 0 36px oklch(0.75 0.18 160 / 0.08),
+    inset 0 1px 0 oklch(1 0 0 / 0.08);
   --glow-green: 0 0 20px oklch(0.75 0.18 160 / 0.5), 0 0 50px oklch(0.75 0.18 160 / 0.2);
   --glow-cyan: 0 0 20px oklch(0.8 0.15 195 / 0.4);
 }
@@ -142,6 +145,18 @@
   to   { background-position: 200% center; }
 }
 
+@keyframes parserScan {
+  0%   { transform: translateX(-110%); opacity: 0; }
+  18%  { opacity: 1; }
+  82%  { opacity: 1; }
+  100% { transform: translateX(110%); opacity: 0; }
+}
+
+@keyframes parserStepPulse {
+  0%, 100% { opacity: 0.56; transform: translateY(0); }
+  50%      { opacity: 1; transform: translateY(-1px); }
+}
+
 @keyframes logoLoaderPulse {
   0%, 100% {
     opacity: 1;
@@ -221,6 +236,31 @@
 .anim-blink      { animation: countdownBlink 1.4s ease-in-out infinite; }
 .anim-spin       { animation: spin 12s linear infinite; }
 
+.parser-processing {
+  position: relative;
+}
+
+.parser-processing-scan {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, transparent, oklch(0.8 0.15 195 / 0.18), transparent),
+    radial-gradient(circle at 50% 50%, oklch(0.75 0.18 160 / 0.08), transparent 45%);
+  animation: parserScan 1.55s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+
+.parser-processing-step {
+  animation: parserStepPulse 1.5s ease-in-out infinite;
+}
+
+.parser-processing-step:nth-child(2) {
+  animation-delay: 0.18s;
+}
+
+.parser-processing-step:nth-child(3) {
+  animation-delay: 0.36s;
+}
+
 /* Stagger delays */
 .delay-0  { animation-delay: 0s; }
 .delay-1  { animation-delay: 0.06s; }
@@ -238,18 +278,46 @@
 
 .glass {
   background: var(--glass-bg);
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  background-image:
+    linear-gradient(135deg, oklch(1 0 0 / 0.07), transparent 42%),
+    radial-gradient(circle at 12% 0%, oklch(0.75 0.18 160 / 0.1), transparent 34%);
+  backdrop-filter: blur(30px) saturate(190%);
+  -webkit-backdrop-filter: blur(30px) saturate(190%);
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow);
 }
 
 .glass-strong {
-  background: oklch(0.14 0.02 260 / 0.72);
-  backdrop-filter: blur(36px) saturate(200%);
-  -webkit-backdrop-filter: blur(36px) saturate(200%);
-  border: 1px solid oklch(0.75 0.18 160 / 0.2);
-  box-shadow: 0 16px 60px oklch(0 0 0 / 0.65), inset 0 1px 0 oklch(1 0 0 / 0.08);
+  background:
+    linear-gradient(135deg, oklch(1 0 0 / 0.08), transparent 38%),
+    radial-gradient(circle at 20% 0%, oklch(0.75 0.18 160 / 0.16), transparent 32%),
+    oklch(0.13 0.022 260 / 0.76);
+  backdrop-filter: blur(44px) saturate(215%);
+  -webkit-backdrop-filter: blur(44px) saturate(215%);
+  border: 1px solid oklch(0.75 0.18 160 / 0.24);
+  box-shadow:
+    0 22px 70px oklch(0 0 0 / 0.68),
+    0 0 44px oklch(0.8 0.15 195 / 0.1),
+    inset 0 1px 0 oklch(1 0 0 / 0.1);
+}
+
+.glass-dock {
+  background:
+    linear-gradient(135deg, oklch(1 0 0 / 0.1), transparent 36%),
+    radial-gradient(circle at 50% -20%, oklch(0.75 0.18 160 / 0.22), transparent 48%),
+    oklch(0.11 0.02 260 / 0.72);
+  backdrop-filter: blur(42px) saturate(220%);
+  -webkit-backdrop-filter: blur(42px) saturate(220%);
+  border: 1px solid oklch(0.75 0.18 160 / 0.22);
+  box-shadow:
+    0 18px 54px oklch(0 0 0 / 0.7),
+    0 0 36px oklch(0.75 0.18 160 / 0.12),
+    inset 0 1px 0 oklch(1 0 0 / 0.12);
+  scrollbar-width: none;
+}
+
+.glass-dock::-webkit-scrollbar {
+  display: none;
 }
 
 .glass-white {
@@ -383,9 +451,9 @@
 ═══════════════════════════════════ */
 
 @theme inline {
-  --font-sans: 'Outfit', 'Outfit Fallback';
-  --font-display: 'Syne', 'Syne Fallback';
-  --font-mono: 'JetBrains Mono', monospace;
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-syne), var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, SFMono-Regular, Menlo, monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -426,9 +494,8 @@
 
 /* ── Font aliases (backwards compat with old Syne/Outfit refs) ─ */
 :root {
-  --font-syne: var(--font-sans);
-  --font-outfit: var(--font-sans);
-  --font-display: var(--font-sans);
+  --font-outfit: var(--font-jakarta);
+  --font-display: var(--font-syne);
 }
 
 @layer base {
@@ -437,7 +504,7 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-family: var(--font-sans), system-ui, sans-serif;
+    font-family: var(--font-jakarta), system-ui, sans-serif;
     font-feature-settings: "ss01", "ss02", "cv11";
     letter-spacing: -0.01em;
     -webkit-font-smoothing: antialiased;
@@ -445,8 +512,8 @@
   }
 }
 
-/* ── Typographic scale utilities — refined Geist system ──── */
-/* Eyebrow: section labels — Geist Mono uppercase for SaaS-pro feel */
+/* ── Typographic scale utilities — Jakarta + Syne + JetBrains system ──── */
+/* Eyebrow: section labels — JetBrains Mono uppercase for match-day metadata */
 .eyebrow {
   font-family: var(--font-mono), ui-monospace, monospace;
   font-size: 0.6875rem;      /* 11px */
