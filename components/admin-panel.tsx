@@ -44,7 +44,6 @@ import {
   UserPlus,
   Trash2,
   Edit,
-  Shield,
   Tag,
   Plus,
   X,
@@ -56,7 +55,7 @@ import { cn } from "@/lib/utils"
 import { Spinner } from "@/components/ui/spinner"
 
 export function AdminPanel() {
-  const { isAdmin, player } = useAuth()
+  const { player } = useAuth()
   const [players, setPlayers] = useState<Player[]>([])
   const [loading, setLoading] = useState(true)
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null)
@@ -65,7 +64,6 @@ export function AdminPanel() {
   const [isAddingPlayer, setIsAddingPlayer] = useState(false)
   const [newPlayerName, setNewPlayerName] = useState("")
   const [newPlayerRating, setNewPlayerRating] = useState(5)
-  const [newPlayerIsAdmin, setNewPlayerIsAdmin] = useState(false)
 
   const loadPlayers = useCallback(async () => {
     setLoading(true)
@@ -103,7 +101,6 @@ export function AdminPanel() {
       await updatePlayer(editingPlayer.id, {
         name: editingPlayer.name,
         dynamic_rating: editingPlayer.dynamic_rating,
-        is_admin: editingPlayer.is_admin,
         is_goalkeeper: editingPlayer.is_goalkeeper ?? false
       })
       await loadPlayers()
@@ -147,30 +144,14 @@ export function AdminPanel() {
   const handleAddPlayer = async () => {
     if (!newPlayerName.trim()) return
     try {
-      await createPlayer(newPlayerName, newPlayerRating, newPlayerIsAdmin)
+      await createPlayer(newPlayerName, newPlayerRating)
       await loadPlayers()
       setIsAddingPlayer(false)
       setNewPlayerName("")
       setNewPlayerRating(5)
-      setNewPlayerIsAdmin(false)
     } catch (error) {
       console.error('Failed to add player:', error)
     }
-  }
-
-  if (!isAdmin) {
-    return (
-      <Card className="border-destructive/30 bg-destructive/5">
-        <CardContent className="flex items-center justify-center py-8">
-          <div className="text-center">
-            <Shield className="mx-auto h-12 w-12 text-destructive/50" />
-            <p className="mt-2 text-sm text-muted-foreground">
-              Solo los administradores pueden acceder a esta seccion
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-    )
   }
 
   return (
@@ -228,14 +209,6 @@ export function AdminPanel() {
                         step={0.5}
                       />
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Switch
-                        id="admin"
-                        checked={newPlayerIsAdmin}
-                        onCheckedChange={setNewPlayerIsAdmin}
-                      />
-                      <Label htmlFor="admin">Es Administrador</Label>
-                    </div>
                   </div>
                   <DialogFooter>
                     <Button variant="outline" onClick={() => setIsAddingPlayer(false)}>
@@ -288,12 +261,7 @@ export function AdminPanel() {
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-medium">{p.name}</span>
-                        {p.is_admin && (
-                          <Badge variant="outline" className="text-xs border-amber-500/50 text-amber-400">
-                            <Shield className="mr-1 h-3 w-3" />
-                            Admin
-                          </Badge>
-                        )}
+
                         {p.is_goalkeeper && (
                           <Badge variant="outline" className="text-xs border-amber-400/50 text-amber-300">
                             <Hand className="mr-1 h-3 w-3" />
@@ -371,22 +339,14 @@ export function AdminPanel() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Puntaje: {editingPlayer.dynamic_rating}</Label>
+                <Label>Puntaje: {editingPlayer.dynamic_rating.toFixed(1)}</Label>
                 <Slider
                   value={[editingPlayer.dynamic_rating]}
                   onValueChange={([v]) => setEditingPlayer({ ...editingPlayer, dynamic_rating: v })}
                   min={1}
                   max={10}
-                  step={0.1}
+                  step={0.5}
                 />
-              </div>
-              <div className="flex items-center gap-2">
-                <Switch
-                  id="edit-admin"
-                  checked={editingPlayer.is_admin}
-                  onCheckedChange={(checked) => setEditingPlayer({ ...editingPlayer, is_admin: checked })}
-                />
-                <Label htmlFor="edit-admin">Es Administrador</Label>
               </div>
               <div className="flex items-center gap-2">
                 <Switch

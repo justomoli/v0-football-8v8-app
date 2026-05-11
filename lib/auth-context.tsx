@@ -115,7 +115,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return (
     <AuthContext.Provider value={{
       player,
-      isAdmin: player?.is_admin ?? false,
+      // Sin roles: todos pueden usar todas las herramientas de la app
+      isAdmin: true,
       isLoading,
       login,
       loginGeneral,

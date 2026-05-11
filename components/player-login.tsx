@@ -6,25 +6,19 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Flame, LogIn, LogOut, Shield } from "lucide-react"
 import { LoadingState, Spinner } from "@/components/ui/spinner"
-
-const ROAST_NAMES = [
-  "pecho frío",
-  "fantasma táctico",
-  "suplente emocional",
-  "cono con botines",
-  "9 de área chica",
-  "líder del banco",
-]
+import { randomRoastNickname, useRotatingDemotivation } from "@/lib/demotivational-quotes"
 
 export function PlayerLogin() {
   const { loginGeneral, player, logout, isLoading: authLoading } = useAuth()
   const [displayName, setDisplayName] = useState("")
   const [isLoggingIn, setIsLoggingIn] = useState(false)
+  const heroRoast = useRotatingDemotivation(43_000)
+  const whisperRoast = useRotatingDemotivation(67_000)
 
   const handleLogin = async () => {
     setIsLoggingIn(true)
     try {
-      const fallback = ROAST_NAMES[Math.floor(Math.random() * ROAST_NAMES.length)]
+      const fallback = randomRoastNickname()
       await loginGeneral(displayName || fallback)
     }
     catch { /* handled in context */ }
@@ -67,8 +61,11 @@ export function PlayerLogin() {
                 Admin
               </span>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Acceso general habilitado. Hoy se edita sin llorar.
+            <p className="text-xs text-muted-foreground leading-snug italic">
+              {heroRoast}
+            </p>
+            <p className="text-[10px] text-muted-foreground/65 mt-1.5 italic leading-snug">
+              {whisperRoast}
             </p>
           </div>
 
@@ -104,8 +101,8 @@ export function PlayerLogin() {
         <h2 className="font-display text-[26px] font-extrabold leading-none tracking-[-0.06em]">
           Entrar a FUTJUEVES
         </h2>
-        <p className="eyebrow-sub mx-auto mt-2 max-w-[18rem]">
-          Un solo acceso general. Sin ratings visibles, sin excusas, sin VAR.
+        <p className="eyebrow-sub mx-auto mt-2 max-w-[20rem] min-h-[2.75rem] text-balance italic text-muted-foreground/90 leading-snug">
+          {heroRoast}
         </p>
       </div>
 
@@ -132,8 +129,8 @@ export function PlayerLogin() {
           )}
         </Button>
 
-        <p className="text-center text-[11px] text-muted-foreground">
-          Si no ponés apodo, el vestuario elige por vos.
+        <p className="text-center text-[11px] text-muted-foreground/80 leading-snug italic">
+          {whisperRoast}
         </p>
       </div>
     </div>

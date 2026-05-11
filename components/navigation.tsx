@@ -2,7 +2,6 @@
 
 import { cn } from "@/lib/utils"
 import { Home, Users, Shuffle, Trophy, BarChart3, Settings, UserRound } from "lucide-react"
-import { useAuth } from "@/lib/auth-context"
 
 interface NavigationProps {
   activeTab: string
@@ -20,8 +19,7 @@ const tabs = [
 const adminTab = { id: "admin", label: "Admin", icon: Settings }
 
 export function Navigation({ activeTab, onTabChange }: NavigationProps) {
-  const { isAdmin } = useAuth()
-  const allTabs = isAdmin ? [...tabs, adminTab] : tabs
+  const allTabs = [...tabs, adminTab]
 
   return (
     <nav

@@ -29,7 +29,6 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { LoadingState } from "@/components/ui/spinner"
-import { useAuth } from "@/lib/auth-context"
 import { MatchDetailDrawer } from "@/components/match-detail-drawer"
 
 /* ── Medal badge ────────────────────────────────────── */
@@ -102,7 +101,6 @@ function Section({ icon: Icon, title, subtitle, color = "primary", children }: {
 }
 
 export function StatsDashboard() {
-  const { isAdmin } = useAuth()
   const [loading, setLoading] = useState(true)
   const [players, setPlayers] = useState<Player[]>([])
   const [seasons, setSeasons] = useState<Season[]>([])
@@ -210,7 +208,7 @@ export function StatsDashboard() {
             >
               <RefreshCw className="h-4 w-4" />
             </button>
-            {currentSeason && isAdmin && (
+            {currentSeason && (
               <Dialog open={closeSeasonDialog} onOpenChange={setCloseSeasonDialog}>
                 <DialogTrigger asChild>
                   <Button variant="outline" size="sm" className="gap-1.5 border-border/40">
@@ -253,7 +251,7 @@ export function StatsDashboard() {
                 </DialogContent>
               </Dialog>
             )}
-            {!currentSeason && isAdmin && (
+            {!currentSeason && (
               <Dialog open={newSeasonDialog} onOpenChange={setNewSeasonDialog}>
                 <DialogTrigger asChild>
                   <Button size="sm" className="gap-1.5">

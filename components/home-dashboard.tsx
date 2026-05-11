@@ -13,6 +13,7 @@ import {
 } from "@/lib/db"
 import type { Player, Season, Match, CurrentMatchSetup } from "@/lib/types"
 import { tierColor } from "@/lib/rating-tier"
+import { useRotatingDemotivation } from "@/lib/demotivational-quotes"
 import {
   Calendar,
   ChevronRight,
@@ -122,9 +123,11 @@ function Eyebrow({ children, className }: { children: React.ReactNode; className
 function HeroCountdown({
   cd,
   confirmed,
+  roast,
 }: {
   cd: ReturnType<typeof useNextThursday>
   confirmed: number
+  roast: string
 }) {
   const dateLabel = cd.targetDate.toLocaleDateString("es-AR", {
     weekday: "long",
@@ -258,6 +261,10 @@ function HeroCountdown({
             />
           </div>
         </div>
+
+        <p className="mt-5 text-[11px] leading-relaxed text-muted-foreground/70 text-center italic px-0.5">
+          {roast}
+        </p>
       </div>
     </div>
   )
@@ -831,6 +838,7 @@ function EmptyLeader({ icon: Icon, label }: { icon: React.ElementType; label: st
 export function HomeDashboard({ onNavigate }: HomeDashboardProps) {
   const { player } = useAuth()
   const cd = useNextThursday()
+  const heroRoast = useRotatingDemotivation(53_000)
 
   const [loading, setLoading] = useState(true)
   const [season, setSeason] = useState<Season | null>(null)
@@ -905,7 +913,7 @@ export function HomeDashboard({ onNavigate }: HomeDashboardProps) {
 
   return (
     <div className="space-y-5">
-      <HeroCountdown cd={cd} confirmed={confirmed} />
+      <HeroCountdown cd={cd} confirmed={confirmed} roast={heroRoast} />
 
       <SmartAction
         setup={setup}

@@ -6,7 +6,6 @@ import {
   Edit,
   Hand,
   Search,
-  Shield,
   Sparkles,
   Star,
   Tag,
@@ -35,6 +34,7 @@ import { Switch } from "@/components/ui/switch"
 import { PlayerFifaCard } from "@/components/player-fifa-card"
 import { LoadingState, Spinner } from "@/components/ui/spinner"
 import { useAuth } from "@/lib/auth-context"
+import { attributeToTen } from "@/lib/player-stats-ten-scale"
 import { addAlias, deleteAlias, getAliasesByPlayerId, getPlayers, updatePlayer } from "@/lib/db"
 import type { Player, PlayerAlias, PlayerPosition } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -87,7 +87,7 @@ function RosterStat({
 }
 
 export function PlayersRoster() {
-  const { isAdmin, player: currentPlayer } = useAuth()
+  const { player: currentPlayer } = useAuth()
   const [players, setPlayers] = useState<Player[]>([])
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState("")
@@ -161,7 +161,6 @@ export function PlayersRoster() {
         height_cm: editingPlayer.height_cm ?? null,
         weight_kg: editingPlayer.weight_kg ?? null,
         dynamic_rating: editingPlayer.dynamic_rating,
-        is_admin: editingPlayer.is_admin,
         is_goalkeeper: editingPlayer.is_goalkeeper ?? false,
         pace: editingPlayer.pace ?? null,
         shot: editingPlayer.shot ?? null,
@@ -298,12 +297,6 @@ export function PlayersRoster() {
                         Arquero
                       </Badge>
                     )}
-                    {p.is_admin && (
-                      <Badge variant="outline" className="border-amber-500/45 text-amber-400">
-                        <Shield className="mr-1 h-3 w-3" />
-                        Admin
-                      </Badge>
-                    )}
                   </div>
                   <div className="mt-2.5 flex items-center gap-3 text-[11px] font-medium text-muted-foreground">
                     <span className="flex items-center gap-1">
@@ -332,16 +325,14 @@ export function PlayersRoster() {
                   >
                     {p.dynamic_rating.toFixed(1)}
                   </span>
-                  {isAdmin && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 rounded-xl text-muted-foreground hover:bg-white/10 hover:text-white"
-                      onClick={() => startEdit(p)}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                  )}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 rounded-xl text-muted-foreground hover:bg-white/10 hover:text-white"
+                    onClick={() => startEdit(p)}
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
             </article>
@@ -360,6 +351,10 @@ export function PlayersRoster() {
         player={selectedPlayer}
         open={!!selectedPlayer}
         onClose={() => setSelectedPlayer(null)}
+        onPlayerUpdated={(upd) => {
+          setPlayers((prev) => prev.map((row) => (row.id === upd.id ? upd : row)))
+          setSelectedPlayer((prev) => (prev?.id === upd.id ? upd : prev))
+        }}
       />
 
       <Dialog open={!!editingPlayer} onOpenChange={(open) => !open && setEditingPlayer(null)}>
@@ -460,18 +455,21 @@ export function PlayersRoster() {
                   }
                   min={1}
                   max={10}
-                  step={0.1}
+                  step={0.5}
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 {ATTRIBUTE_FIELDS.map(([field, label]) => {
-                  const value = editingPlayer[field] ?? Math.round(editingPlayer.dynamic_rating * 9.5)
+                  const value = attributeToTen(
+                    editingPlayer[field],
+                    editingPlayer.dynamic_rating,
+                  )
                   return (
                     <div key={field} className="space-y-2 rounded-2xl border border-white/[0.08] bg-white/[0.035] p-3">
                       <Label className="flex items-center justify-between">
                         <span>{label}</span>
-                        <span className="font-mono text-primary">{value}</span>
+                        <span className="font-mono text-primary">{value.toFixed(1)}</span>
                       </Label>
                       <Slider
                         value={[value]}
@@ -479,8 +477,8 @@ export function PlayersRoster() {
                           setEditingPlayer({ ...editingPlayer, [field]: next })
                         }
                         min={1}
-                        max={99}
-                        step={1}
+                        max={10}
+                        step={0.5}
                       />
                     </div>
                   )
@@ -497,16 +495,6 @@ export function PlayersRoster() {
                     }
                   />
                   <Label htmlFor="roster-gk">Arquero</Label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Switch
-                    id="roster-admin"
-                    checked={editingPlayer.is_admin}
-                    onCheckedChange={(checked) =>
-                      setEditingPlayer({ ...editingPlayer, is_admin: checked })
-                    }
-                  />
-                  <Label htmlFor="roster-admin">Admin</Label>
                 </div>
               </div>
 
