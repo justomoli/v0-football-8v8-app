@@ -39,7 +39,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { 
+import {
   Settings,
   UserPlus,
   Trash2,
@@ -49,13 +49,14 @@ import {
   X,
   RefreshCw,
   Users,
-  Hand
+  Hand,
+  LogOut
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Spinner } from "@/components/ui/spinner"
 
 export function AdminPanel() {
-  const { player } = useAuth()
+  const { player, logout } = useAuth()
   const [players, setPlayers] = useState<Player[]>([])
   const [loading, setLoading] = useState(true)
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null)
@@ -406,6 +407,33 @@ export function AdminPanel() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Session — logout */}
+      <Card className="border-destructive/25 bg-gradient-to-br from-destructive/5 to-transparent">
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-2">
+            <div className="rounded-lg bg-destructive/15 p-2">
+              <LogOut className="h-4 w-4 text-destructive" />
+            </div>
+            <div>
+              <CardTitle className="text-base">Sesión</CardTitle>
+              <CardDescription className="text-xs">
+                Cerrá sesión y volvé al login.
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-0">
+          <Button
+            variant="outline"
+            onClick={() => logout()}
+            className="w-full gap-2 border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
+          >
+            <LogOut className="h-4 w-4" />
+            Cerrar sesión
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   )
 }

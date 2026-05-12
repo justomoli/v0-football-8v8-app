@@ -23,6 +23,7 @@ export interface Player {
   physique?: number | null
   photo_url?: string | null
   nickname?: string | null
+  bio?: string | null
   created_at: string
   updated_at: string
 }

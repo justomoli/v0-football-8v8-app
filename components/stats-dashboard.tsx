@@ -30,6 +30,7 @@ import {
 import { cn } from "@/lib/utils"
 import { LoadingState } from "@/components/ui/spinner"
 import { MatchDetailDrawer } from "@/components/match-detail-drawer"
+import { PlayerFifaCard } from "@/components/player-fifa-card"
 
 /* ── Medal badge ────────────────────────────────────── */
 function MedalBadge({ rank }: { rank: number }) {
@@ -112,6 +113,7 @@ export function StatsDashboard() {
   const [closeSeasonDialog, setCloseSeasonDialog] = useState(false)
   const [newSeasonDialog, setNewSeasonDialog] = useState(false)
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null)
+  const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null)
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -304,7 +306,12 @@ export function StatsDashboard() {
                 style={{ animationDelay: `${i * 0.05}s` }}
               >
                 <MedalBadge rank={i} />
-                <span className="flex-1 font-semibold">{entry.player.name}</span>
+                <button
+                  onClick={() => setSelectedPlayer(entry.player)}
+                  className="flex-1 text-left font-semibold hover:text-primary transition-colors truncate"
+                >
+                  {entry.player.name}
+                </button>
                 <div className="flex items-center gap-1.5">
                   <Target className="h-3.5 w-3.5 text-primary" />
                   <span className="font-black text-sm" style={{ fontFamily: "var(--font-mono), ui-monospace, monospace" }}>
@@ -369,9 +376,12 @@ export function StatsDashboard() {
                     {/* Name + tagline */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-baseline gap-2">
-                        <span className="font-semibold text-sm truncate leading-tight">
+                        <button
+                          onClick={() => setSelectedPlayer(entry.player)}
+                          className="font-semibold text-sm truncate leading-tight hover:text-amber-300 transition-colors text-left"
+                        >
                           {entry.player.name}
-                        </span>
+                        </button>
                         {isLeader && (
                           <span
                             className="text-[8px] font-black tracking-[0.18em] uppercase text-amber-300/90 shrink-0"
@@ -460,9 +470,12 @@ export function StatsDashboard() {
                   <MedalBadge rank={i} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between mb-1.5">
-                      <span className="font-semibold text-sm truncate leading-none">
+                      <button
+                        onClick={() => setSelectedPlayer(player)}
+                        className="font-semibold text-sm truncate leading-none hover:text-primary transition-colors text-left"
+                      >
                         {player.name}
-                      </span>
+                      </button>
                       <div className="flex items-center gap-1 shrink-0 ml-2 leading-none">
                         <Star className="h-3 w-3" style={{ fill: tier, color: tier }} />
                         <span
@@ -660,6 +673,17 @@ export function StatsDashboard() {
           </div>
         </Section>
       )}
+
+      {/* FIFA card dialog */}
+      <PlayerFifaCard
+        player={selectedPlayer}
+        open={!!selectedPlayer}
+        onClose={() => setSelectedPlayer(null)}
+        onPlayerUpdated={(updated) => {
+          setPlayers((prev) => prev.map((p) => (p.id === updated.id ? updated : p)))
+          setSelectedPlayer(updated)
+        }}
+      />
     </div>
   )
 }

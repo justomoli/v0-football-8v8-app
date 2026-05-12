@@ -4,10 +4,32 @@ import { useEffect, useId, useState, type ComponentProps } from "react"
 
 import { cn } from "@/lib/utils"
 
+/**
+ * F8 logotype — sports stencil-cut style.
+ *
+ * Construction (180×180 viewBox):
+ *  - F: notched bold letterform at x≈34–82 with a chamfer cut on top-right
+ *      (gives a "ripped jersey number" feel when paired with italic skew).
+ *  - 8: figure-of-eight built from two donuts (evenodd holes) at x≈98–146.
+ *  - A diagonal speed-slash bar between the letters that cuts both glyphs
+ *      via a mask (see SVG below). The slash is rendered as its own path so
+ *      the trace animation draws it last like a final brushstroke.
+ *
+ * The italic skew (~7°) is applied via group transform — keeps the source
+ * paths orthogonal/readable while making the glyph feel like motion.
+ */
 const LOGO_PATHS = [
-  "M101.141 53H136.632C151.023 53 162.689 64.6662 162.689 79.0573V112.904H148.112V79.0573C148.112 78.7105 148.098 78.3662 148.072 78.0251L112.581 112.898C112.701 112.902 112.821 112.904 112.941 112.904H148.112V126.672H112.941C98.5504 126.672 86.5638 114.891 86.5638 100.5V66.7434H101.141V100.5C101.141 101.15 101.191 101.792 101.289 102.422L137.56 66.7816C137.255 66.7563 136.945 66.7434 136.632 66.7434H101.141V53Z",
-  "M65.2926 124.136L14 66.7372H34.6355L64.7495 100.436V66.7372H80.1365V118.47C80.1365 126.278 70.4953 129.958 65.2926 124.136Z",
+  // F — bold with chamfered top-right (stencil notch)
+  "M34 48 L86 48 L86 56 L74 64 L50 64 L50 84 L76 84 L76 98 L50 98 L50 134 L34 134 Z",
+  // 8 — two stacked donuts via evenodd fill-rule
+  "M146 72 A24 24 0 1 0 98 72 A24 24 0 1 0 146 72 Z " +
+    "M134 72 A12 12 0 1 1 110 72 A12 12 0 1 1 134 72 Z " +
+    "M146 112 A24 24 0 1 0 98 112 A24 24 0 1 0 146 112 Z " +
+    "M134 112 A12 12 0 1 1 110 112 A12 12 0 1 1 134 112 Z",
 ] as const
+
+/** Diagonal speed-slash cutting through both glyphs (mask removes it visually). */
+const SLASH_RECT = { x: 18, y: 90, w: 150, h: 4 }
 
 type SpinnerProps = ComponentProps<"span"> & {
   /** Tamaño del icono en píxeles (ancho y alto). Por defecto 16. */
@@ -54,9 +76,24 @@ function Spinner({ className, logoSize, ...props }: SpinnerProps) {
           <clipPath id={clipId}>
             <rect width="180" height="180" fill="white" />
           </clipPath>
+          {/* Mask: black slash cuts a diagonal gap through the glyphs */}
+          <mask id={`${clipId}-slice`}>
+            <rect width="180" height="180" fill="white" />
+            <rect
+              x={SLASH_RECT.x}
+              y={SLASH_RECT.y}
+              width={SLASH_RECT.w}
+              height={SLASH_RECT.h}
+              fill="black"
+              transform="rotate(-9 90 90)"
+            />
+          </mask>
         </defs>
         <g clipPath={`url(#${clipId})`}>
-          <g transform="translate(90 90) scale(1.18) translate(-90 -90)">
+          <g
+            mask={`url(#${clipId}-slice)`}
+            transform="translate(90 90) scale(1.18) skewX(-7) translate(-90 -90)"
+          >
             <g className="opacity-25">
               {LOGO_PATHS.map((d, i) => (
                 <path
@@ -71,7 +108,12 @@ function Spinner({ className, logoSize, ...props }: SpinnerProps) {
               ))}
             </g>
             {LOGO_PATHS.map((d, i) => (
-              <path key={`fill-${i}`} d={d} fill="currentColor" />
+              <path
+                key={`fill-${i}`}
+                d={d}
+                fill="currentColor"
+                fillRule="evenodd"
+              />
             ))}
             <g className="logo-loader-trace">
               {LOGO_PATHS.map((d, i) => (
@@ -102,7 +144,13 @@ function Spinner({ className, logoSize, ...props }: SpinnerProps) {
               ))}
             </g>
             {LOGO_PATHS.map((d, i) => (
-              <path key={`front-${i}`} d={d} fill="currentColor" className="opacity-80" />
+              <path
+                key={`front-${i}`}
+                d={d}
+                fill="currentColor"
+                fillRule="evenodd"
+                className="opacity-80"
+              />
             ))}
           </g>
         </g>
@@ -120,6 +168,8 @@ type LoadingStateProps = {
    * Así las cargas muy cortas no muestran overlay. Usa 0 para mostrar al instante.
    */
   delayMs?: number
+  /** Centrado en el área de contenido (descuenta header sticky + nav flotante). */
+  contentCentered?: boolean
 }
 
 function LoadingState({
@@ -127,6 +177,7 @@ function LoadingState({
   className,
   spinnerClassName,
   delayMs = 380,
+  contentCentered = true,
 }: LoadingStateProps) {
   const [visible, setVisible] = useState(delayMs <= 0)
 
@@ -138,10 +189,18 @@ function LoadingState({
 
   if (!visible) return null
 
+  /**
+   * Compensación para centrar visualmente entre el header sticky (~64px) y
+   * la nav flotante (≈80px de alto + bottom-offset). Se aplica como padding
+   * al contenedor flex → el centrado real es entre header y nav.
+   */
+  const contentPadding = contentCentered ? "pt-16 pb-24" : ""
+
   return (
     <div
       className={cn(
         "fixed inset-0 z-50 flex min-h-screen items-center justify-center overflow-hidden bg-[oklch(0.055_0.016_260)]",
+        contentPadding,
         className,
       )}
     >

@@ -13,7 +13,7 @@ import {
 } from "@/lib/db"
 import type { Player, Season, Match, CurrentMatchSetup } from "@/lib/types"
 import { tierColor } from "@/lib/rating-tier"
-import { useRotatingDemotivation } from "@/lib/demotivational-quotes"
+import { PlayerFifaCard } from "@/components/player-fifa-card"
 import {
   Calendar,
   ChevronRight,
@@ -123,11 +123,9 @@ function Eyebrow({ children, className }: { children: React.ReactNode; className
 function HeroCountdown({
   cd,
   confirmed,
-  roast,
 }: {
   cd: ReturnType<typeof useNextThursday>
   confirmed: number
-  roast: string
 }) {
   const dateLabel = cd.targetDate.toLocaleDateString("es-AR", {
     weekday: "long",
@@ -262,9 +260,6 @@ function HeroCountdown({
           </div>
         </div>
 
-        <p className="mt-5 text-[11px] leading-relaxed text-muted-foreground/70 text-center italic px-0.5">
-          {roast}
-        </p>
       </div>
     </div>
   )
@@ -388,11 +383,13 @@ function MyStats({
   rank,
   total,
   seasonAvg,
+  onOpenCard,
 }: {
   player: Player
   rank: number | null
   total: number
   seasonAvg: number
+  onOpenCard?: () => void
 }) {
   const tier = tierColor(player.dynamic_rating)
   const delta = player.dynamic_rating - seasonAvg
@@ -400,7 +397,11 @@ function MyStats({
 
   return (
     <div className="glass rounded-2xl p-5 anim-fade-up delay-2">
-      <div className="flex items-center gap-3 mb-4">
+      <button
+        type="button"
+        onClick={onOpenCard}
+        className="w-full flex items-center gap-3 mb-4 text-left group cursor-pointer"
+      >
         {/* Avatar */}
         <div
           className="relative h-12 w-12 shrink-0 rounded-xl flex items-center justify-center text-lg font-semibold"
@@ -455,7 +456,7 @@ function MyStats({
             </div>
           </div>
         )}
-      </div>
+      </button>
 
       {/* Stats grid */}
       <div className="grid grid-cols-4 gap-2">
@@ -838,7 +839,6 @@ function EmptyLeader({ icon: Icon, label }: { icon: React.ElementType; label: st
 export function HomeDashboard({ onNavigate }: HomeDashboardProps) {
   const { player } = useAuth()
   const cd = useNextThursday()
-  const heroRoast = useRotatingDemotivation(53_000)
 
   const [loading, setLoading] = useState(true)
   const [season, setSeason] = useState<Season | null>(null)
@@ -848,6 +848,7 @@ export function HomeDashboard({ onNavigate }: HomeDashboardProps) {
   const [topScorer, setTopScorer] = useState<{ player: Player; goals: number } | null>(null)
   const [topMotm, setTopMotm] = useState<{ player: Player; count: number } | null>(null)
   const [allPlayers, setAllPlayers] = useState<Player[]>([])
+  const [cardOpen, setCardOpen] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -913,7 +914,7 @@ export function HomeDashboard({ onNavigate }: HomeDashboardProps) {
 
   return (
     <div className="space-y-5">
-      <HeroCountdown cd={cd} confirmed={confirmed} roast={heroRoast} />
+      <HeroCountdown cd={cd} confirmed={confirmed} />
 
       <SmartAction
         setup={setup}
@@ -927,8 +928,18 @@ export function HomeDashboard({ onNavigate }: HomeDashboardProps) {
           rank={myRank}
           total={allPlayers.length}
           seasonAvg={seasonAvg}
+          onOpenCard={() => setCardOpen(true)}
         />
       )}
+
+      <PlayerFifaCard
+        player={cardOpen ? player ?? null : null}
+        open={cardOpen}
+        onClose={() => setCardOpen(false)}
+        onPlayerUpdated={(updated) => {
+          setAllPlayers((prev) => prev.map((p) => (p.id === updated.id ? updated : p)))
+        }}
+      />
 
       {lastMatch && (
         <LastMatch
