@@ -7,7 +7,19 @@ import { getSessionPlayer, createSession, deleteSession, getPlayers } from "@/li
 const AUTH_TOKEN_KEY = 'futbol8_session'
 const GENERAL_SESSION_KEY = 'futjueves_general_session'
 
-function createGeneralPlayer(name = "pecho frío"): Player {
+const GUEST_DEFAULT_NAME = "Invitado"
+
+// Nombres viejos de la versión "roast" — si están en localStorage los limpiamos.
+const LEGACY_ROAST_NAMES = new Set([
+  "pecho frío",
+  "fantasma táctico",
+  "suplente emocional",
+  "cono con botines",
+  "9 de área chica",
+  "líder del banco",
+])
+
+function createGeneralPlayer(name = GUEST_DEFAULT_NAME): Player {
   const now = new Date().toISOString()
 
   return {
@@ -45,9 +57,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loadSession = useCallback(async () => {
     try {
-      const generalName = localStorage.getItem(GENERAL_SESSION_KEY)
-      if (generalName) {
-        setPlayer(createGeneralPlayer(generalName))
+      const rawName = localStorage.getItem(GENERAL_SESSION_KEY)
+      if (rawName) {
+        // Migración: si el nombre cacheado era un roast viejo, lo limpiamos
+        const cleanName = LEGACY_ROAST_NAMES.has(rawName.toLowerCase())
+          ? GUEST_DEFAULT_NAME
+          : rawName
+        if (cleanName !== rawName) {
+          localStorage.setItem(GENERAL_SESSION_KEY, cleanName)
+        }
+        setPlayer(createGeneralPlayer(cleanName))
         return
       }
 
@@ -88,7 +107,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const loginGeneral = async (displayName?: string) => {
-    const name = displayName?.trim() || "pecho frío"
+    const name = displayName?.trim() || GUEST_DEFAULT_NAME
     localStorage.removeItem(AUTH_TOKEN_KEY)
     localStorage.setItem(GENERAL_SESSION_KEY, name)
     setPlayer(createGeneralPlayer(name))
