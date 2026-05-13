@@ -1,25 +1,31 @@
 "use client"
 
+import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { Home, Users, Shuffle, Trophy, BarChart3, Settings, UserRound } from "lucide-react"
-
-interface NavigationProps {
-  activeTab: string
-  onTabChange: (tab: string) => void
-}
+import {
+  Home,
+  Users,
+  Shuffle,
+  Trophy,
+  BarChart3,
+  Settings,
+  UserRound,
+} from "lucide-react"
+import { ROUTES } from "@/lib/routes"
 
 const tabs = [
-  { id: "home",       label: "Home",      icon: Home },
-  { id: "parser",     label: "Carga",     icon: Users },
-  { id: "players",    label: "Plantel",   icon: UserRound },
-  { id: "matchmaker", label: "Equipos",   icon: Shuffle },
-  { id: "postmatch",  label: "Partido",   icon: Trophy },
-  { id: "stats",      label: "Stats",     icon: BarChart3 },
-]
-const adminTab = { id: "admin", label: "Admin", icon: Settings }
+  { href: ROUTES.home,       label: "Home",     icon: Home },
+  { href: ROUTES.parser,     label: "Carga",    icon: Users },
+  { href: ROUTES.players,    label: "Plantel",  icon: UserRound },
+  { href: ROUTES.matchmaker, label: "Equipos",  icon: Shuffle },
+  { href: ROUTES.postmatch,  label: "Partido",  icon: Trophy },
+  { href: ROUTES.stats,      label: "Stats",    icon: BarChart3 },
+  { href: ROUTES.admin,      label: "Admin",    icon: Settings },
+] as const
 
-export function Navigation({ activeTab, onTabChange }: NavigationProps) {
-  const allTabs = [...tabs, adminTab]
+export function Navigation() {
+  const pathname = usePathname()
 
   return (
     <nav
@@ -27,14 +33,18 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
       style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
     >
       <div className="glass-dock mx-auto flex max-w-[calc(100vw-1.5rem)] items-center justify-start gap-1 overflow-x-auto rounded-[2rem] px-2 py-2 sm:justify-center">
-        {allTabs.map((tab) => {
+        {tabs.map((tab) => {
           const Icon = tab.icon
-          const isActive = activeTab === tab.id
+          // Home matches exact; others match by prefix so nested routes stay highlighted
+          const isActive =
+            tab.href === "/" ? pathname === "/" : pathname.startsWith(tab.href)
 
           return (
-            <button
-              key={tab.id}
-              onClick={() => onTabChange(tab.id)}
+            <Link
+              key={tab.href}
+              href={tab.href}
+              prefetch
+              aria-current={isActive ? "page" : undefined}
               className={cn(
                 "relative flex items-center gap-2 rounded-full border px-3 py-2.5 text-xs font-semibold tracking-tight",
                 "transition-all duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/45",
@@ -60,7 +70,7 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
               >
                 {tab.label}
               </span>
-            </button>
+            </Link>
           )
         })}
       </div>

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { JetBrains_Mono, Plus_Jakarta_Sans, Syne } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
+import { AppShell } from '@/components/app-shell'
 import './globals.css'
 
 const plusJakarta = Plus_Jakarta_Sans({
@@ -77,7 +78,7 @@ export default function RootLayout({
         className={`${plusJakarta.variable} ${syne.variable} ${jetBrainsMono.variable} antialiased`}
         style={{ fontFamily: 'var(--font-jakarta), system-ui, sans-serif' }}
       >
-        {children}
+        <AppShell>{children}</AppShell>
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>

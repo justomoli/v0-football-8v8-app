@@ -187,14 +187,30 @@ function LoadingState({
     return () => window.clearTimeout(id)
   }, [delayMs])
 
+  // Lock body scroll while the overlay is visible so the user can't drag
+  // the page and de-center the spinner.
+  useEffect(() => {
+    if (!visible) return
+    const previousOverflow = document.body.style.overflow
+    const previousTouch = document.body.style.touchAction
+    document.body.style.overflow = "hidden"
+    document.body.style.touchAction = "none"
+    return () => {
+      document.body.style.overflow = previousOverflow
+      document.body.style.touchAction = previousTouch
+    }
+  }, [visible])
+
   if (!visible) return null
 
   /**
    * Compensación para centrar visualmente entre el header sticky (~64px) y
-   * la nav flotante (≈80px de alto + bottom-offset). Se aplica como padding
-   * al contenedor flex → el centrado real es entre header y nav.
+   * la nav flotante (≈90px de alto + bottom-offset). Se aplica como padding
+   * al contenedor flex; el `pb` extra lo levanta del lower-middle perceptivo
+   * del mobile (el peso visual de la nav lo "tira" hacia abajo si solo
+   * compensamos los píxeles reales).
    */
-  const contentPadding = contentCentered ? "pt-16 pb-24" : ""
+  const contentPadding = contentCentered ? "pt-10 pb-40" : ""
 
   return (
     <div

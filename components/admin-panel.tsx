@@ -66,6 +66,9 @@ export function AdminPanel() {
   const [newPlayerName, setNewPlayerName] = useState("")
   const [newPlayerRating, setNewPlayerRating] = useState(5)
   const [searchQuery, setSearchQuery] = useState("")
+  const [savingEdit, setSavingEdit] = useState(false)
+  const [savingNew, setSavingNew] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   const loadPlayers = useCallback(async () => {
     setLoading(true)
@@ -93,15 +96,18 @@ export function AdminPanel() {
   }
 
   const handleEditPlayer = async (p: Player) => {
+    setSaveError(null)
     setEditingPlayer(p)
     await loadAliases(p.id)
   }
 
   const handleSavePlayer = async () => {
     if (!editingPlayer) return
+    setSavingEdit(true)
+    setSaveError(null)
     try {
       await updatePlayer(editingPlayer.id, {
-        name: editingPlayer.name,
+        name: editingPlayer.name.trim(),
         dynamic_rating: editingPlayer.dynamic_rating,
         is_goalkeeper: editingPlayer.is_goalkeeper ?? false,
       })
@@ -109,6 +115,11 @@ export function AdminPanel() {
       setEditingPlayer(null)
     } catch (error) {
       console.error("Failed to save player:", error)
+      setSaveError(
+        error instanceof Error ? error.message : "No pudimos guardar los cambios."
+      )
+    } finally {
+      setSavingEdit(false)
     }
   }
 
@@ -145,14 +156,21 @@ export function AdminPanel() {
 
   const handleAddPlayer = async () => {
     if (!newPlayerName.trim()) return
+    setSavingNew(true)
+    setSaveError(null)
     try {
-      await createPlayer(newPlayerName, newPlayerRating)
+      await createPlayer(newPlayerName.trim(), newPlayerRating)
       await loadPlayers()
       setIsAddingPlayer(false)
       setNewPlayerName("")
       setNewPlayerRating(5)
     } catch (error) {
       console.error("Failed to add player:", error)
+      setSaveError(
+        error instanceof Error ? error.message : "No pudimos crear el jugador."
+      )
+    } finally {
+      setSavingNew(false)
     }
   }
 
@@ -230,7 +248,13 @@ export function AdminPanel() {
             >
               <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
             </button>
-            <Dialog open={isAddingPlayer} onOpenChange={setIsAddingPlayer}>
+            <Dialog
+              open={isAddingPlayer}
+              onOpenChange={(open) => {
+                setIsAddingPlayer(open)
+                if (!open) setSaveError(null)
+              }}
+            >
               <DialogTrigger asChild>
                 <Button size="sm" className="h-8 gap-1 text-[12px] font-semibold">
                   <UserPlus className="h-3.5 w-3.5" />
@@ -292,21 +316,39 @@ export function AdminPanel() {
                     />
                   </div>
                 </div>
+                {saveError && (
+                  <div
+                    className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-[12px] text-destructive/90"
+                    role="alert"
+                  >
+                    {saveError}
+                  </div>
+                )}
                 <DialogFooter className="gap-2">
                   <Button
                     variant="outline"
                     onClick={() => setIsAddingPlayer(false)}
+                    disabled={savingNew}
                     className="rounded-xl"
                   >
                     Cancelar
                   </Button>
                   <Button
                     onClick={handleAddPlayer}
-                    disabled={!newPlayerName.trim()}
+                    disabled={!newPlayerName.trim() || savingNew}
                     className="rounded-xl gap-2"
                   >
-                    <UserPlus className="h-4 w-4" />
-                    Crear
+                    {savingNew ? (
+                      <>
+                        <Spinner className="h-4 w-4" />
+                        Creando…
+                      </>
+                    ) : (
+                      <>
+                        <UserPlus className="h-4 w-4" />
+                        Crear
+                      </>
+                    )}
                   </Button>
                 </DialogFooter>
               </DialogContent>
@@ -490,7 +532,12 @@ export function AdminPanel() {
       {/* ── Edit player dialog ── */}
       <Dialog
         open={!!editingPlayer}
-        onOpenChange={(open) => !open && setEditingPlayer(null)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditingPlayer(null)
+            setSaveError(null)
+          }
+        }}
       >
         <DialogContent
           className="glass-strong border-border/30 sm:max-w-md p-5"
@@ -627,16 +674,36 @@ export function AdminPanel() {
               </div>
             </div>
           )}
+          {saveError && (
+            <div
+              className="mt-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-[12px] text-destructive/90"
+              role="alert"
+            >
+              {saveError}
+            </div>
+          )}
           <DialogFooter className="gap-2">
             <Button
               variant="outline"
               onClick={() => setEditingPlayer(null)}
+              disabled={savingEdit}
               className="rounded-xl"
             >
               Cancelar
             </Button>
-            <Button onClick={handleSavePlayer} className="rounded-xl">
-              Guardar cambios
+            <Button
+              onClick={handleSavePlayer}
+              disabled={savingEdit || !editingPlayer?.name.trim()}
+              className="rounded-xl gap-2 min-w-[140px]"
+            >
+              {savingEdit ? (
+                <>
+                  <Spinner className="h-4 w-4" />
+                  Guardando…
+                </>
+              ) : (
+                "Guardar cambios"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
