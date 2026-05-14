@@ -157,65 +157,63 @@
   50%      { opacity: 1; transform: translateY(-1px); }
 }
 
-@keyframes logoLoaderPulse {
-  0%, 100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.96;
-    transform: scale(1.045);
-  }
+/* ── Logo loader animations ── */
+
+@keyframes logoImgBreathe {
+  0%, 100% { transform: scale(1);    }
+  50%       { transform: scale(1.03); }
 }
 
-@keyframes logoLoaderHalo {
-  0%, 100% {
-    opacity: 0.45;
-    transform: scale(0.92);
-  }
-  50% {
-    opacity: 0.9;
-    transform: scale(1.18);
-  }
+@keyframes logoHaloPulse {
+  0%, 100% { opacity: 0.7; transform: scale(0.94); }
+  50%       { opacity: 1;   transform: scale(1.12); }
 }
 
-@keyframes logoTraceSweep {
-  from { stroke-dashoffset: 1; }
-  to   { stroke-dashoffset: 0; }
+@keyframes logoOrbitCW {
+  from { transform: rotate(0deg);   }
+  to   { transform: rotate(360deg); }
 }
 
-@keyframes logoSparkSweep {
-  0% {
-    opacity: 0;
-    stroke-dashoffset: 1;
-  }
-  14%, 72% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
-    stroke-dashoffset: 0;
-  }
+@keyframes logoOrbitCCW {
+  from { transform: rotate(0deg);    }
+  to   { transform: rotate(-360deg); }
 }
 
-.logo-loader-trace path {
-  animation: logoTraceSweep 2.4s cubic-bezier(0.65, 0, 0.35, 1) infinite;
-  filter: drop-shadow(0 0 8px oklch(0.8 0.15 195 / 0.8));
-  opacity: 0.7;
-  stroke-dasharray: 0.08 0.92;
+@keyframes logoScanSweep {
+  0%   { top: -15%; opacity: 0;   }
+  8%   { opacity: 1;               }
+  55%  { top: 100%; opacity: 0.6; }
+  100% { top: 100%; opacity: 0;   }
 }
 
-.logo-loader-spark path {
-  animation: logoSparkSweep 2.4s cubic-bezier(0.65, 0, 0.35, 1) infinite;
-  filter:
-    drop-shadow(0 0 5px oklch(1 0 0 / 0.95))
-    drop-shadow(0 0 14px oklch(0.75 0.18 160 / 0.8));
-  stroke-dasharray: 0.018 0.982;
+.logo-loader-img {
+  animation: logoImgBreathe 2.8s ease-in-out infinite;
+}
+
+.logo-loader-halo {
+  animation: logoHaloPulse 2.8s ease-in-out infinite;
+}
+
+.logo-loader-orbit {
+  animation: logoOrbitCW 3.2s linear infinite;
+  transform-origin: center;
+}
+
+.logo-loader-orbit-rev {
+  animation: logoOrbitCCW 5s linear infinite;
+  transform-origin: center;
+}
+
+.logo-loader-scan {
+  animation: logoScanSweep 3.6s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .logo-loader-trace path,
-  .logo-loader-spark path {
+  .logo-loader-img,
+  .logo-loader-halo,
+  .logo-loader-orbit,
+  .logo-loader-orbit-rev,
+  .logo-loader-scan {
     animation: none;
   }
 }
