@@ -133,10 +133,10 @@ function PlayerRow({
           style={{ background: tier, boxShadow: `0 0 8px ${tier}A0` }}
         />
 
-        <div className="flex items-center gap-2 pl-2.5 pr-2 py-2">
+        <div className="flex items-center gap-3 pl-3 pr-2.5 py-2.5">
           {/* Jersey number circle */}
           <div
-            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold tabular-nums"
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold tabular-nums"
             style={{
               background: isWhite ? "oklch(0.20 0 0 / 0.45)" : "oklch(0.08 0 0 / 0.65)",
               color: "oklch(0.72 0 0)",
@@ -149,7 +149,7 @@ function PlayerRow({
 
           {/* Name */}
           <div className="flex-1 min-w-0">
-            <div className="text-[13px] font-semibold truncate leading-tight tracking-tight">
+            <div className="text-[15px] font-semibold truncate leading-tight tracking-tight">
               {player.name}
             </div>
           </div>
@@ -157,11 +157,11 @@ function PlayerRow({
           {/* Rating + RATING label */}
           <div className="shrink-0 flex flex-col items-end leading-none">
             <span
-              className="text-[16px] font-semibold tabular-nums"
+              className="text-[18px] font-semibold tabular-nums"
               style={{
                 fontFamily: "var(--font-mono), ui-monospace, monospace",
                 color: tier,
-                textShadow: `0 0 8px ${tier}50`,
+                textShadow: `0 0 10px ${tier}55`,
                 letterSpacing: "-0.05em",
               }}
             >
@@ -172,7 +172,7 @@ function PlayerRow({
             </span>
           </div>
 
-          {/* Swap button — appears on hover (desktop) */}
+          {/* Swap button — always visible on mobile, hover on desktop */}
           {onSwap && (
             <button
               type="button"
@@ -182,9 +182,9 @@ function PlayerRow({
                 onSwap(player.id)
               }}
               onPointerDown={(e) => e.stopPropagation()}
-              className="ml-0.5 shrink-0 inline-flex h-6 w-6 items-center justify-center rounded-md opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground/70 hover:text-foreground hover:bg-white/10"
+              className="ml-1 shrink-0 inline-flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground/50 hover:text-foreground hover:bg-white/10 transition-colors sm:opacity-0 sm:group-hover:opacity-100"
             >
-              {isWhite ? <ArrowRight className="h-3 w-3" /> : <ArrowLeft className="h-3 w-3" />}
+              {isWhite ? <ArrowRight className="h-3.5 w-3.5" /> : <ArrowLeft className="h-3.5 w-3.5" />}
             </button>
           )}
         </div>
@@ -258,6 +258,7 @@ export function Matchmaker() {
   const [confirmedPlayers, setConfirmedPlayers] = useState<Player[]>([])
   const [whiteTeamPlayers, setWhiteTeamPlayers] = useState<Player[]>([])
   const [blackTeamPlayers, setBlackTeamPlayers] = useState<Player[]>([])
+  const [activeTeam, setActiveTeam] = useState<"white" | "black">("white")
 
   const loadSetup = useCallback(async () => {
     setLoading(true)
@@ -464,16 +465,103 @@ export function Matchmaker() {
             </div>
           </div>
 
-          {/* Team cards — always side by side */}
-          <div className="grid grid-cols-2 gap-2.5">
-            <TeamCard players={whiteTeamPlayers} variant="white" delay={0.05} onSwap={swapPlayer} />
-            <TeamCard players={blackTeamPlayers} variant="black" delay={0.12} onSwap={swapPlayer} />
-          </div>
+          {/* Teams — tab layout para legibilidad mobile */}
+          <div className="glass rounded-2xl overflow-hidden anim-fade-up">
+            {/* Comparison header — ambos equipos de un vistazo */}
+            <div className="grid grid-cols-2 divide-x divide-white/[0.06]">
+              {[
+                { label: "Blanco", players: whiteTeamPlayers, team: "white" as const },
+                { label: "Negro",  players: blackTeamPlayers, team: "black" as const },
+              ].map(({ label, players, team }) => {
+                const avg = players.length
+                  ? players.reduce((s, p) => s + p.dynamic_rating, 0) / players.length
+                  : 0
+                const isActive = activeTeam === team
+                const isWhite = team === "white"
+                return (
+                  <button
+                    key={team}
+                    type="button"
+                    onClick={() => setActiveTeam(team)}
+                    className={cn(
+                      "flex items-center gap-2.5 px-4 py-3 transition-all duration-200",
+                      isActive
+                        ? isWhite ? "bg-white/[0.07]" : "bg-black/30"
+                        : "opacity-55 hover:opacity-80"
+                    )}
+                  >
+                    <div
+                      className="h-4 w-4 shrink-0 rounded-full"
+                      style={
+                        isWhite
+                          ? { background: "white", boxShadow: isActive ? "0 0 10px rgba(255,255,255,0.5)" : "none" }
+                          : { background: "#111", outline: "1.5px solid #555", boxShadow: isActive ? "0 0 8px rgba(0,0,0,0.7)" : "none" }
+                      }
+                    />
+                    <div className="text-left flex-1 min-w-0">
+                      <div className={cn("eyebrow text-[10px]", isActive ? "" : "text-muted-foreground")}>
+                        {label}
+                      </div>
+                      <div
+                        className="tabular-nums leading-none mt-0.5"
+                        style={{
+                          fontFamily: "var(--font-mono), ui-monospace, monospace",
+                          fontSize: 16,
+                          fontWeight: 600,
+                          letterSpacing: "-0.04em",
+                          color: isActive
+                            ? isWhite ? "rgba(255,255,255,0.95)" : "oklch(0.65 0 0)"
+                            : "oklch(0.45 0 0)",
+                        }}
+                      >
+                        {avg.toFixed(1)}
+                        <span
+                          className="ml-1 text-[9px] font-normal tracking-wider"
+                          style={{ color: isActive ? "oklch(0.6 0 0)" : "oklch(0.38 0 0)" }}
+                        >
+                          prom
+                        </span>
+                      </div>
+                    </div>
+                    {/* Active indicator dot */}
+                    {isActive && (
+                      <div
+                        className="h-1.5 w-1.5 rounded-full shrink-0"
+                        style={{
+                          background: isWhite ? "white" : "oklch(0.65 0 0)",
+                          boxShadow: isWhite ? "0 0 6px rgba(255,255,255,0.6)" : "none",
+                        }}
+                      />
+                    )}
+                  </button>
+                )
+              })}
+            </div>
 
-          {/* Swipe hint */}
-          <p className="text-center text-[10px] text-muted-foreground/55 -mt-1" style={{ fontFamily: "var(--font-mono), ui-monospace, monospace", letterSpacing: "0.08em" }}>
-            ← desliza un jugador al otro equipo →
-          </p>
+            {/* Divider */}
+            <div className="h-px bg-white/[0.06]" />
+
+            {/* Full-width player list for active team */}
+            <div className="p-3 space-y-1.5">
+              {(activeTeam === "white" ? whiteTeamPlayers : blackTeamPlayers).map((p, i) => (
+                <PlayerRow
+                  key={p.id}
+                  player={p}
+                  index={i}
+                  variant={activeTeam}
+                  onSwap={swapPlayer}
+                />
+              ))}
+            </div>
+
+            {/* Swipe hint */}
+            <p
+              className="pb-3 text-center text-[10px] text-muted-foreground/40"
+              style={{ fontFamily: "var(--font-mono), ui-monospace, monospace", letterSpacing: "0.08em" }}
+            >
+              deslizá un jugador para moverlo al otro equipo
+            </p>
+          </div>
 
           {/* Share image */}
           <div className="glass rounded-2xl p-5 anim-fade-up delay-3">
