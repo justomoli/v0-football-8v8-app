@@ -1,5 +1,5 @@
 /**
- * Ejecuta scripts/005_reset_players_kriko_justo.sql contra Postgres (Supabase).
+ * Ejecuta scripts/009_wipe_db_reset_players.sql contra Postgres (Supabase).
  * Lee DATABASE_URL del entorno o de `<raíz del proyecto>/.env.local`.
  */
 import fs from "node:fs"
@@ -21,12 +21,12 @@ No se encontró DATABASE_URL.
    DATABASE_URL=postgresql://postgres.[ref]:TU_PASSWORD@aws-0-....pooler.supabase.com:6543/postgres
    (${path.join(PROJECT_ROOT, ".env.local")})
 
-Luego desde la raíz: pnpm db:reset-players
+Luego desde la raíz: pnpm db:wipe
 `)
   process.exit(1)
 }
 
-const sqlPath = path.join(__dirname, "005_reset_players_kriko_justo.sql")
+const sqlPath = path.join(__dirname, "009_wipe_db_reset_players.sql")
 const sql = fs.readFileSync(sqlPath, "utf8")
 
 const useSsl = !/localhost|127\.0\.0\.1/.test(url)
@@ -38,7 +38,7 @@ const client = new pg.Client({
 try {
   await client.connect()
   await client.query(sql)
-  console.log("Listo: 005_reset_players_kriko_justo.sql aplicado correctamente.")
+  console.log("Listo: 009_wipe_db_reset_players.sql aplicado correctamente.")
 } catch (err) {
   console.error("Error ejecutando SQL:", err.message)
   process.exitCode = 1

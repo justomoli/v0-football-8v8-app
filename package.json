@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "db:reset-players": "node --env-file=.env.local scripts/run-reset-players.mjs"
+    "db:reset-players": "node scripts/run-reset-players.mjs",
+    "db:wipe": "node scripts/run-wipe-db.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
