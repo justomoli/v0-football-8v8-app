@@ -20,7 +20,17 @@ import {
   Trash2,
   RefreshCw,
   Zap,
+  UserPlus,
+  UserCheck,
 } from "lucide-react"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
 import { LoadingState, Spinner } from "@/components/ui/spinner"
 
@@ -67,6 +77,9 @@ export function WhatsAppParser({ onPlayersConfirmed }: WhatsAppParserProps) {
   const [processing, setProcessing] = useState(false)
   const [loading, setLoading] = useState(true)
   const [parserError, setParserError] = useState<string | null>(null)
+  const [previewOpen, setPreviewOpen] = useState(false)
+  const [pendingParsed, setPendingParsed] = useState<ParsedPlayer[]>([])
+  const [confirming, setConfirming] = useState(false)
 
   const loadMatchSetup = useCallback(async () => {
     setLoading(true)
@@ -102,33 +115,54 @@ export function WhatsAppParser({ onPlayersConfirmed }: WhatsAppParserProps) {
     setParserError(null)
     try {
       const parsed = await parsePlayersFromText(rawText)
-      setParsedPlayers(parsed)
 
       if (parsed.length === 0) {
-        await dbSetConfirmedPlayers([])
-        setConfirmedPlayerIds([])
-        setConfirmedPlayers([])
-        onPlayersConfirmed?.([])
+        setParsedPlayers([])
         setParserError("No encontré nombres válidos en esa lista.")
         return
       }
 
-      const resolvedPlayers = await Promise.all(parsed.map(resolveParsedPlayer))
-      const uniquePlayers = resolvedPlayers.filter((player, index, list) =>
-        list.findIndex((p) => p.id === player.id) === index,
-      )
-      const confirmedIds = uniquePlayers.map((player) => player.id)
-
-      await dbSetConfirmedPlayers(confirmedIds)
-      setConfirmedPlayerIds(confirmedIds)
-      setConfirmedPlayers(uniquePlayers)
-      onPlayersConfirmed?.(confirmedIds)
+      // Show preview dialog instead of committing immediately
+      setPendingParsed(parsed)
+      setPreviewOpen(true)
     } catch (e) {
       console.error(e)
       setParserError("No pude procesar la lista. Revisá los nombres y probá de nuevo.")
     } finally {
       setProcessing(false)
     }
+  }
+
+  const handleConfirmUpload = async () => {
+    if (pendingParsed.length === 0) return
+    setConfirming(true)
+    setParserError(null)
+    try {
+      const resolvedPlayers = await Promise.all(pendingParsed.map(resolveParsedPlayer))
+      const uniquePlayers = resolvedPlayers.filter((player, index, list) =>
+        list.findIndex((p) => p.id === player.id) === index,
+      )
+      const confirmedIds = uniquePlayers.map((player) => player.id)
+
+      await dbSetConfirmedPlayers(confirmedIds)
+      setParsedPlayers(pendingParsed)
+      setConfirmedPlayerIds(confirmedIds)
+      setConfirmedPlayers(uniquePlayers)
+      onPlayersConfirmed?.(confirmedIds)
+      setPreviewOpen(false)
+      setPendingParsed([])
+    } catch (e) {
+      console.error(e)
+      setParserError("No pude guardar los jugadores. Probá de nuevo.")
+    } finally {
+      setConfirming(false)
+    }
+  }
+
+  const handleCancelUpload = () => {
+    if (confirming) return
+    setPreviewOpen(false)
+    setPendingParsed([])
   }
 
   const removePlayer = async (playerId: string) => {
@@ -398,6 +432,145 @@ export function WhatsAppParser({ onPlayersConfirmed }: WhatsAppParserProps) {
           )}
         </div>
       )}
+
+      {/* ── Confirmation dialog before DB upload ── */}
+      <Dialog
+        open={previewOpen}
+        onOpenChange={(open) => {
+          if (!open) handleCancelUpload()
+        }}
+      >
+        <DialogContent className="glass-strong border-border/30 sm:max-w-md p-5" aria-describedby={undefined}>
+          <DialogHeader className="text-left">
+            <DialogTitle className="font-display text-[20px] font-extrabold tracking-tight">
+              Confirmar carga
+            </DialogTitle>
+            <DialogDescription className="eyebrow-sub mt-1">
+              Revisá los jugadores antes de guardar en la base.
+            </DialogDescription>
+          </DialogHeader>
+
+          {(() => {
+            const newOnes = pendingParsed.filter((p) => p.isNew)
+            const knownOnes = pendingParsed.filter((p) => !p.isNew)
+            return (
+              <div className="space-y-3 py-2">
+                {/* Summary chips */}
+                <div className="flex flex-wrap gap-2">
+                  <span
+                    className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold"
+                    style={{
+                      background: "oklch(0.78 0.22 145 / 0.12)",
+                      border: "1px solid oklch(0.78 0.22 145 / 0.30)",
+                      color: "oklch(0.85 0.22 145)",
+                      fontFamily: "var(--font-mono), ui-monospace, monospace",
+                      letterSpacing: "0.04em",
+                    }}
+                  >
+                    <UserCheck className="h-3 w-3" />
+                    {knownOnes.length} reconocidos
+                  </span>
+                  <span
+                    className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold"
+                    style={{
+                      background: "oklch(0.85 0.18 80 / 0.12)",
+                      border: "1px solid oklch(0.85 0.18 80 / 0.30)",
+                      color: "oklch(0.92 0.18 85)",
+                      fontFamily: "var(--font-mono), ui-monospace, monospace",
+                      letterSpacing: "0.04em",
+                    }}
+                  >
+                    <UserPlus className="h-3 w-3" />
+                    {newOnes.length} nuevos
+                  </span>
+                </div>
+
+                {/* Lists */}
+                <div className="max-h-[40vh] overflow-y-auto space-y-3 -mx-1 px-1">
+                  {knownOnes.length > 0 && (
+                    <div>
+                      <div className="eyebrow text-[9px] mb-1.5 opacity-65">Reconocidos</div>
+                      <ul className="space-y-1">
+                        {knownOnes.map((p, i) => (
+                          <li
+                            key={`k-${i}`}
+                            className="flex items-center gap-2 rounded-lg bg-white/[0.025] border border-white/[0.06] px-2.5 py-1.5 text-[12.5px]"
+                          >
+                            <UserCheck className="h-3 w-3 text-primary/80 shrink-0" />
+                            <span className="truncate">{p.existingPlayer?.name ?? p.name}</span>
+                            {p.alias && (
+                              <span
+                                className="ml-auto text-[10px] opacity-55"
+                                style={{ fontFamily: "var(--font-mono), ui-monospace, monospace" }}
+                              >
+                                ← {p.name}
+                              </span>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {newOnes.length > 0 && (
+                    <div>
+                      <div className="eyebrow text-[9px] mb-1.5 opacity-65 text-amber-300/80">
+                        Nuevos · se crean con media 5
+                      </div>
+                      <ul className="space-y-1">
+                        {newOnes.map((p, i) => (
+                          <li
+                            key={`n-${i}`}
+                            className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-[12.5px]"
+                            style={{
+                              background: "oklch(0.85 0.18 80 / 0.06)",
+                              border: "1px solid oklch(0.85 0.18 80 / 0.20)",
+                            }}
+                          >
+                            <UserPlus className="h-3 w-3 text-amber-300/80 shrink-0" />
+                            <span className="truncate">{p.name}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )
+          })()}
+
+          {parserError && (
+            <div
+              className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-[12px] text-destructive/90"
+              role="alert"
+            >
+              {parserError}
+            </div>
+          )}
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={handleCancelUpload}
+              disabled={confirming}
+              className="rounded-xl"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleConfirmUpload}
+              disabled={confirming || pendingParsed.length === 0}
+              className="rounded-xl gap-2 min-w-[160px]"
+            >
+              {confirming ? (
+                <><Spinner className="h-4 w-4" /> Guardando…</>
+              ) : (
+                <><Check className="h-4 w-4" /> Confirmar y guardar</>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

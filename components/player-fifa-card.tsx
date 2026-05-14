@@ -10,19 +10,6 @@ import { uploadPlayerPhoto } from "@/lib/image-upload"
 import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
 
-const POSITION_SHORT: Record<string, string> = {
-  GK: "ARQ",
-  DEF: "DEF",
-  MID: "MED",
-  FWD: "DEL",
-}
-const POSITION_FULL: Record<string, string> = {
-  GK: "Arquero",
-  DEF: "Defensor",
-  MID: "Mediocampista",
-  FWD: "Delantero",
-}
-
 interface PlayerFifaCardProps {
   player: Player | null
   open: boolean
@@ -124,10 +111,6 @@ export function PlayerFifaCard({
   const overallFifaUi = Math.round(view.dynamic_rating * 10)
   const overallTen = view.dynamic_rating
 
-  const positionKey = view.position ?? (view.is_goalkeeper ? "GK" : "MID")
-  const positionShort = POSITION_SHORT[positionKey] ?? positionKey
-  const positionFull = POSITION_FULL[positionKey] ?? positionKey
-
   const photoUrl = getPhotoUrl(view)
   const showPhoto = !photoError
 
@@ -193,13 +176,6 @@ export function PlayerFifaCard({
       >
         <DialogTitle className="sr-only">Carta de jugador: {view.name}</DialogTitle>
 
-        <DialogClose
-          type="button"
-          className="absolute right-0 top-0 z-30 flex h-9 w-9 -translate-y-1 translate-x-1 items-center justify-center rounded-2xl border border-white/15 bg-black/65 text-white/80 shadow-[0_0_24px_rgba(0,0,0,0.45)] backdrop-blur-md transition-all hover:scale-105 hover:text-white focus:outline-none focus:ring-2 focus:ring-primary/60"
-        >
-          <X className="h-4 w-4" />
-        </DialogClose>
-
         <div
           className="relative rounded-[28px] overflow-hidden anim-scale-in"
           style={{
@@ -208,6 +184,21 @@ export function PlayerFifaCard({
             boxShadow: `0 0 60px ${theme.glow}, inset 0 1px 0 rgba(255,255,255,0.06)`,
           }}
         >
+          {/* Close button — inside the card, theme-tinted */}
+          <DialogClose
+            type="button"
+            aria-label="Cerrar"
+            className="group absolute right-3 top-3 z-30 inline-flex h-9 w-9 items-center justify-center rounded-full backdrop-blur-md transition-all duration-200 hover:scale-[1.08] active:scale-95 focus:outline-none focus:ring-2"
+            style={{
+              background: "rgba(0,0,0,0.55)",
+              border: `1px solid ${theme.border}60`,
+              boxShadow: `0 4px 18px rgba(0,0,0,0.55), inset 0 0 0 1px rgba(255,255,255,0.04)`,
+              color: theme.accent,
+              ['--tw-ring-color' as never]: `${theme.accent}60`,
+            }}
+          >
+            <X className="h-4 w-4 transition-transform duration-200 group-hover:rotate-90" strokeWidth={2.5} />
+          </DialogClose>
           {/* Top decorative stripes pattern */}
           <div
             className="absolute inset-x-0 top-0 h-24 pointer-events-none opacity-[0.07]"
@@ -283,27 +274,16 @@ export function PlayerFifaCard({
                 }}
               />
 
-              {/* Position + tier */}
-              <div className="flex flex-col items-start gap-1 mt-1.5">
+              {/* Tier */}
+              <div className="flex flex-col items-start gap-1 mt-2">
                 <span
                   className="uppercase"
                   style={{
                     fontFamily: "var(--font-mono), ui-monospace, monospace",
                     fontSize: 11,
                     color: theme.accent,
-                    letterSpacing: "0.2em",
-                    fontWeight: 600,
-                  }}
-                >
-                  {positionShort}
-                </span>
-                <span
-                  className="uppercase opacity-60"
-                  style={{
-                    fontFamily: "var(--font-mono), ui-monospace, monospace",
-                    fontSize: 9,
-                    color: theme.accent,
                     letterSpacing: "0.22em",
+                    fontWeight: 600,
                   }}
                 >
                   {theme.label}
@@ -424,23 +404,20 @@ export function PlayerFifaCard({
             {/* Decorative bar */}
             <div className="mt-3 mb-2 flex items-center justify-center gap-2">
               <div
-                className="h-px w-8"
+                className="h-px w-12"
                 style={{ background: `${theme.border}80` }}
               />
               <span
-                className="uppercase tabular-nums"
+                className="rounded-full"
                 style={{
-                  fontFamily: "var(--font-mono), ui-monospace, monospace",
-                  fontSize: 10,
-                  color: theme.accent,
-                  letterSpacing: "0.22em",
-                  fontWeight: 500,
+                  width: 4,
+                  height: 4,
+                  background: theme.accent,
+                  boxShadow: `0 0 6px ${theme.accent}80`,
                 }}
-              >
-                {positionFull}
-              </span>
+              />
               <div
-                className="h-px w-8"
+                className="h-px w-12"
                 style={{ background: `${theme.border}80` }}
               />
             </div>

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import {
   getCurrentMatchSetup,
   setTeams,
@@ -10,7 +10,8 @@ import type { Player, CurrentMatchSetup } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import {
   Shuffle, Copy, Check, Star, RefreshCw,
-  Users, ImageIcon, Zap, TrendingUp
+  Users, ImageIcon, Zap, TrendingUp,
+  ArrowLeft, ArrowRight
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { LoadingState, Spinner } from "@/components/ui/spinner"
@@ -34,15 +35,17 @@ function RatingBar({ value, max = 10 }: { value: number; max?: number }) {
   )
 }
 
-/* ── Player row ─────────────────────────────────────── */
+/* ── Player row (swipeable) ─────────────────────────── */
 function PlayerRow({
   player,
   index,
   variant,
+  onSwap,
 }: {
   player: Player
   index: number
   variant: "white" | "black"
+  onSwap?: (playerId: string) => void
 }) {
   const isWhite = variant === "white"
   const r = player.dynamic_rating
@@ -52,76 +55,138 @@ function PlayerRow({
     r >= 4 ? "oklch(0.85 0.16 85)"  :
              "oklch(0.7 0.2 25)"
 
+  // Swipe state — white swipes right to send to black, black swipes left
+  const [dx, setDx] = useState(0)
+  const [swiping, setSwiping] = useState(false)
+  const startX = useRef<number | null>(null)
+  const SWIPE_THRESHOLD = 60
+
+  const allowedDir = isWhite ? 1 : -1 // sign of dx that triggers swap
+
+  const handleStart = (clientX: number) => {
+    startX.current = clientX
+    setSwiping(true)
+  }
+  const handleMove = (clientX: number) => {
+    if (startX.current == null) return
+    const delta = clientX - startX.current
+    // Only allow drag in the meaningful direction
+    if (Math.sign(delta) === allowedDir || delta === 0) setDx(delta)
+    else setDx(delta * 0.25) // rubber band the wrong way
+  }
+  const handleEnd = () => {
+    if (startX.current == null) return
+    const triggered = Math.sign(dx) === allowedDir && Math.abs(dx) > SWIPE_THRESHOLD
+    startX.current = null
+    setSwiping(false)
+    if (triggered && onSwap) {
+      // Slide out, then swap
+      setDx(allowedDir * 320)
+      setTimeout(() => {
+        onSwap(player.id)
+        setDx(0)
+      }, 160)
+    } else {
+      setDx(0)
+    }
+  }
+
+  const progress = Math.min(1, Math.abs(dx) / SWIPE_THRESHOLD)
+  const swapHint = Math.sign(dx) === allowedDir && progress > 0.15
+
   return (
     <div
-      className={cn(
-        "group relative overflow-hidden rounded-xl anim-slide-right",
-        "transition-all duration-200 hover:translate-x-[2px]",
-        isWhite
-          ? "bg-white/8 hover:bg-white/[0.13] border border-white/10"
-          : "bg-black/25 hover:bg-black/35 border border-white/[0.07]"
-      )}
+      className="relative overflow-hidden rounded-xl anim-slide-right select-none"
       style={{ animationDelay: `${index * 0.05}s` }}
     >
-      {/* Tier accent stripe */}
+      {/* Swipe hint background — only on the side we're swiping toward */}
       <div
-        className="absolute left-0 top-0 bottom-0 w-[3px]"
+        className="absolute inset-y-0 flex items-center justify-center px-3 pointer-events-none transition-opacity"
         style={{
-          background: tier,
-          boxShadow: `0 0 8px ${tier}A0`,
+          [isWhite ? "right" : "left"]: 0,
+          opacity: swapHint ? progress : 0,
+          width: 60,
+          background: `linear-gradient(${isWhite ? "270deg" : "90deg"}, ${tier}40, transparent)`,
         }}
-      />
+      >
+        {isWhite ? <ArrowRight className="h-4 w-4" style={{ color: tier }} /> : <ArrowLeft className="h-4 w-4" style={{ color: tier }} />}
+      </div>
 
-      <div className="flex items-center gap-2.5 pl-3 pr-3 py-2">
-        {/* Jersey number tag */}
+      <div
+        className={cn(
+          "group relative overflow-hidden rounded-xl border",
+          isWhite ? "bg-white/8 border-white/10" : "bg-black/25 border-white/[0.07]",
+          !swiping && "transition-transform duration-200"
+        )}
+        style={{ transform: `translateX(${dx}px)` }}
+        onPointerDown={(e) => {
+          e.currentTarget.setPointerCapture(e.pointerId)
+          handleStart(e.clientX)
+        }}
+        onPointerMove={(e) => handleMove(e.clientX)}
+        onPointerUp={handleEnd}
+        onPointerCancel={handleEnd}
+      >
+        {/* Tier stripe */}
         <div
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[11px] font-semibold tabular-nums"
-          style={{
-            background: isWhite ? "oklch(0.96 0 0 / 0.18)" : "oklch(0.08 0 0 / 0.55)",
-            color: isWhite ? "white" : "oklch(0.68 0 0)",
-            fontFamily: "var(--font-mono), ui-monospace, monospace",
-            letterSpacing: "-0.04em",
-            boxShadow:
-              "inset 0 1px 0 rgba(255,255,255,0.08), inset 0 -1px 0 rgba(0,0,0,0.25)",
-          }}
-        >
-          {index + 1}
-        </div>
+          className="absolute left-0 top-0 bottom-0 w-[3px]"
+          style={{ background: tier, boxShadow: `0 0 8px ${tier}A0` }}
+        />
 
-        {/* Name + rating bar */}
-        <div className="flex-1 min-w-0">
-          <div className="text-[14px] font-semibold truncate leading-none mb-1.5 tracking-tight">
-            {player.name}
-          </div>
-          <div className="h-[3px] rounded-full bg-white/8 overflow-hidden">
-            <div
-              className="h-full rounded-full"
-              style={{
-                width: `${Math.min(100, (r / 10) * 100)}%`,
-                background: `linear-gradient(90deg, ${tier}, ${tier}80)`,
-                boxShadow: `0 0 6px ${tier}90`,
-                transition: "width 0.9s cubic-bezier(0.16, 1, 0.3, 1)",
-              }}
-            />
-          </div>
-        </div>
-
-        {/* Rating value */}
-        <div className="shrink-0 flex flex-col items-end leading-none gap-1">
-          <span
-            className="text-[17px] font-semibold tabular-nums"
+        <div className="flex items-center gap-2 pl-2.5 pr-2 py-2">
+          {/* Jersey number circle */}
+          <div
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold tabular-nums"
             style={{
+              background: isWhite ? "oklch(0.20 0 0 / 0.45)" : "oklch(0.08 0 0 / 0.65)",
+              color: "oklch(0.72 0 0)",
               fontFamily: "var(--font-mono), ui-monospace, monospace",
-              color: tier,
-              textShadow: `0 0 8px ${tier}50`,
-              letterSpacing: "-0.05em",
+              letterSpacing: "-0.04em",
             }}
           >
-            {r.toFixed(1)}
-          </span>
-          <span className="text-[8px] font-bold uppercase tracking-[0.15em] text-muted-foreground/50">
-            rating
-          </span>
+            {index + 1}
+          </div>
+
+          {/* Name */}
+          <div className="flex-1 min-w-0">
+            <div className="text-[13px] font-semibold truncate leading-tight tracking-tight">
+              {player.name}
+            </div>
+          </div>
+
+          {/* Rating + RATING label */}
+          <div className="shrink-0 flex flex-col items-end leading-none">
+            <span
+              className="text-[16px] font-semibold tabular-nums"
+              style={{
+                fontFamily: "var(--font-mono), ui-monospace, monospace",
+                color: tier,
+                textShadow: `0 0 8px ${tier}50`,
+                letterSpacing: "-0.05em",
+              }}
+            >
+              {r.toFixed(1)}
+            </span>
+            <span className="mt-0.5 text-[7px] font-bold uppercase tracking-[0.18em] text-muted-foreground/45">
+              rating
+            </span>
+          </div>
+
+          {/* Swap button — appears on hover (desktop) */}
+          {onSwap && (
+            <button
+              type="button"
+              aria-label="Mover al otro equipo"
+              onClick={(e) => {
+                e.stopPropagation()
+                onSwap(player.id)
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              className="ml-0.5 shrink-0 inline-flex h-6 w-6 items-center justify-center rounded-md opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground/70 hover:text-foreground hover:bg-white/10"
+            >
+              {isWhite ? <ArrowRight className="h-3 w-3" /> : <ArrowLeft className="h-3 w-3" />}
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -133,10 +198,12 @@ function TeamCard({
   players,
   variant,
   delay = 0,
+  onSwap,
 }: {
   players: Player[]
   variant: "white" | "black"
   delay?: number
+  onSwap?: (playerId: string) => void
 }) {
   const isWhite = variant === "white"
   const avg = players.length ? players.reduce((s, p) => s + p.dynamic_rating, 0) / players.length : 0
@@ -144,36 +211,38 @@ function TeamCard({
 
   return (
     <div
-      className={cn("rounded-2xl p-4 space-y-3 anim-scale-in", isWhite ? "glass-white" : "glass-dark")}
+      className={cn("rounded-2xl p-3 space-y-3 anim-scale-in", isWhite ? "glass-white" : "glass-dark")}
       style={{ animationDelay: `${delay}s` }}
     >
       {/* Team header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
           <div
-            className="h-5 w-5 rounded-full shadow-lg"
+            className="h-4 w-4 shrink-0 rounded-full shadow-lg"
             style={
               isWhite
-                ? { background: "white", boxShadow: "0 0 12px rgba(255,255,255,0.6)" }
-                : { background: "#111", boxShadow: "0 2px 8px rgba(0,0,0,0.8)", outline: "2px solid #444" }
+                ? { background: "white", boxShadow: "0 0 10px rgba(255,255,255,0.55)" }
+                : { background: "#111", boxShadow: "0 2px 6px rgba(0,0,0,0.7)", outline: "1.5px solid #444" }
             }
           />
-          <h3 className="eyebrow">
+          <h3 className="eyebrow truncate text-[10px]">
             Equipo {isWhite ? "Blanco" : "Negro"}
           </h3>
         </div>
-        <div className="text-right">
-          <div className="text-xs font-bold text-foreground">
-            {avg.toFixed(1)} <span className="text-muted-foreground font-normal text-[10px]">prom</span>
+        <div className="text-right shrink-0 leading-tight">
+          <div className="text-[11px] font-bold text-foreground tabular-nums" style={{ fontFamily: "var(--font-mono), ui-monospace, monospace" }}>
+            {avg.toFixed(1)} <span className="text-muted-foreground font-normal text-[9px]">prom</span>
           </div>
-          <div className="text-[10px] text-muted-foreground">{total.toFixed(1)} total</div>
+          <div className="text-[9px] text-muted-foreground tabular-nums" style={{ fontFamily: "var(--font-mono), ui-monospace, monospace" }}>
+            {total.toFixed(1)} total
+          </div>
         </div>
       </div>
 
       {/* Players */}
       <div className="space-y-1.5">
         {players.map((p, i) => (
-          <PlayerRow key={p.id} player={p} index={i} variant={variant} />
+          <PlayerRow key={p.id} player={p} index={i} variant={variant} onSwap={onSwap} />
         ))}
       </div>
     </div>
@@ -213,21 +282,51 @@ export function Matchmaker() {
     if (confirmedPlayers.length < 2) return
     setGenerating(true)
     try {
-      const sorted = [...confirmedPlayers].sort((a, b) => b.dynamic_rating - a.dynamic_rating)
+      // Sort by rating desc, but shuffle within equal-rating ties for variance
+      const sorted = [...confirmedPlayers].sort((a, b) => {
+        if (b.dynamic_rating !== a.dynamic_rating) return b.dynamic_rating - a.dynamic_rating
+        return Math.random() - 0.5
+      })
+      // Pair adjacent ratings; for each pair randomly assign one to white, the other to black.
+      // Preserves balance (pairs sum to ~0 diff) and randomizes per click.
       const white: Player[] = []
       const black: Player[] = []
-      sorted.forEach((player, i) => {
-        const round = Math.floor(i / 2)
-        const isEvenRound = round % 2 === 0
-        const isFirstPick = i % 2 === 0
-        if ((isEvenRound && isFirstPick) || (!isEvenRound && !isFirstPick)) white.push(player)
-        else black.push(player)
-      })
+      for (let i = 0; i < sorted.length; i += 2) {
+        const a = sorted[i]
+        const b = sorted[i + 1]
+        if (!b) {
+          const wSum = white.reduce((s, p) => s + p.dynamic_rating, 0)
+          const bSum = black.reduce((s, p) => s + p.dynamic_rating, 0)
+          if (wSum <= bSum) white.push(a); else black.push(a)
+          break
+        }
+        if (Math.random() < 0.5) { white.push(a); black.push(b) }
+        else                     { white.push(b); black.push(a) }
+      }
       await setTeams(white.map(p => p.id), black.map(p => p.id))
       setWhiteTeamPlayers(white)
       setBlackTeamPlayers(black)
     } catch (e) { console.error(e) }
     finally { setGenerating(false) }
+  }
+
+  const swapPlayer = async (playerId: string) => {
+    const inWhite = whiteTeamPlayers.some((p) => p.id === playerId)
+    const player = (inWhite ? whiteTeamPlayers : blackTeamPlayers).find((p) => p.id === playerId)
+    if (!player) return
+    const nextWhite = inWhite
+      ? whiteTeamPlayers.filter((p) => p.id !== playerId)
+      : [...whiteTeamPlayers, player]
+    const nextBlack = inWhite
+      ? [...blackTeamPlayers, player]
+      : blackTeamPlayers.filter((p) => p.id !== playerId)
+    setWhiteTeamPlayers(nextWhite)
+    setBlackTeamPlayers(nextBlack)
+    try {
+      await setTeams(nextWhite.map((p) => p.id), nextBlack.map((p) => p.id))
+    } catch (e) {
+      console.error(e)
+    }
   }
 
   const formatTeamsForWhatsApp = () => {
@@ -365,11 +464,16 @@ export function Matchmaker() {
             </div>
           </div>
 
-          {/* Team cards */}
-          <div className="grid gap-4 md:grid-cols-2">
-            <TeamCard players={whiteTeamPlayers} variant="white" delay={0.05} />
-            <TeamCard players={blackTeamPlayers} variant="black" delay={0.12} />
+          {/* Team cards — always side by side */}
+          <div className="grid grid-cols-2 gap-2.5">
+            <TeamCard players={whiteTeamPlayers} variant="white" delay={0.05} onSwap={swapPlayer} />
+            <TeamCard players={blackTeamPlayers} variant="black" delay={0.12} onSwap={swapPlayer} />
           </div>
+
+          {/* Swipe hint */}
+          <p className="text-center text-[10px] text-muted-foreground/55 -mt-1" style={{ fontFamily: "var(--font-mono), ui-monospace, monospace", letterSpacing: "0.08em" }}>
+            ← desliza un jugador al otro equipo →
+          </p>
 
           {/* Share image */}
           <div className="glass rounded-2xl p-5 anim-fade-up delay-3">

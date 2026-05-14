@@ -10,6 +10,7 @@ import {
   getSeasonTopMotms,
   closeSeason,
   createSeason,
+  deleteMatch,
 } from "@/lib/db"
 import type { Player, Season, Match } from "@/lib/types"
 import { Button } from "@/components/ui/button"
@@ -24,8 +25,19 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import {
   BarChart3, Trophy, Target, Star, Calendar,
-  Medal, Lock, Plus, History, TrendingUp, Award, RefreshCw, ChevronRight
+  Medal, Lock, Plus, History, TrendingUp, Award, RefreshCw, ChevronRight, Trash2
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { LoadingState } from "@/components/ui/spinner"
@@ -156,6 +168,15 @@ export function StatsDashboard() {
       setNewSeasonDialog(true)
       await loadData()
     } catch (e) { console.error(e) }
+  }
+
+  const handleDeleteMatch = async (matchId: string) => {
+    try {
+      await deleteMatch(matchId)
+      await loadData()
+    } catch (e) {
+      console.error("Failed to delete match:", e)
+    }
   }
 
   const handleStartNewSeason = async () => {
@@ -541,12 +562,21 @@ export function StatsDashboard() {
               const wWin = match.white_score > match.black_score
               const bWin = match.black_score > match.white_score
               return (
-                <button
+                <div
                   key={match.id}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => setSelectedMatch(match)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault()
+                      setSelectedMatch(match)
+                    }
+                  }}
                   className={cn(
-                    "group relative w-full text-left rounded-xl px-4 py-3 anim-fade-in border",
+                    "group relative w-full text-left rounded-xl px-4 py-3 anim-fade-in border cursor-pointer",
                     "transition-all duration-200 hover:translate-x-[2px] hover:border-primary/30",
+                    "focus:outline-none focus:ring-2 focus:ring-primary/40",
                     match.is_special_event
                       ? "bg-primary/8 border-primary/25"
                       : "bg-secondary/25 border-border/20"
@@ -618,7 +648,43 @@ export function StatsDashboard() {
                     className="absolute top-1/2 -translate-y-1/2 right-2 h-3.5 w-3.5 text-muted-foreground/30
                       group-hover:text-primary group-hover:translate-x-0.5 transition-all"
                   />
-                </button>
+
+                  {/* Trash — delete this match */}
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <button
+                        type="button"
+                        aria-label="Eliminar partido"
+                        onClick={(e) => e.stopPropagation()}
+                        className="absolute top-2 right-2 inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 transition-colors"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent
+                      className="glass-strong border-border/30"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <AlertDialogHeader>
+                        <AlertDialogTitle className="font-display text-[18px] font-extrabold tracking-tight">
+                          Eliminar partido
+                        </AlertDialogTitle>
+                        <AlertDialogDescription className="eyebrow-sub">
+                          Se borran los goles, ratings y MOTM de este partido. Se recalculan stats. No se puede deshacer.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel className="rounded-xl">Cancelar</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => handleDeleteMatch(match.id)}
+                          className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/85"
+                        >
+                          Eliminar
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
               )
             })}
           </div>

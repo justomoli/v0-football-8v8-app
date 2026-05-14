@@ -417,6 +417,83 @@ export async function saveMatchWithStats(
   return match
 }
 
+// ==================== DELETE MATCHES ====================
+
+async function recomputePlayerStats(playerId: string): Promise<void> {
+  const player = await getPlayerById(playerId)
+  if (!player) return
+
+  const { data: statsRows } = await supabase
+    .from('match_stats')
+    .select('goals_scored')
+    .eq('player_id', playerId)
+
+  const total_matches = statsRows?.length ?? 0
+  const total_goals = statsRows?.reduce((s, r) => s + (Number(r.goals_scored) || 0), 0) ?? 0
+
+  const { count: motmCount } = await supabase
+    .from('matches')
+    .select('*', { count: 'exact', head: true })
+    .eq('motm_player_id', playerId)
+
+  const { data: ratings } = await supabase
+    .from('player_ratings')
+    .select('rating')
+    .eq('player_id', playerId)
+
+  const avg = ratings && ratings.length > 0
+    ? ratings.reduce((s, r) => s + Number(r.rating), 0) / ratings.length
+    : player.dynamic_rating
+
+  await updatePlayer(playerId, {
+    total_matches,
+    total_goals,
+    motm_count: motmCount ?? 0,
+    dynamic_rating: Math.round(avg * 10) / 10,
+  })
+}
+
+export async function deleteMatch(matchId: string): Promise<void> {
+  const stats = await getMatchStats(matchId)
+  const affected = new Set<string>(stats.map((s) => s.player_id))
+
+  const { data: matchRow } = await supabase
+    .from('matches')
+    .select('motm_player_id')
+    .eq('id', matchId)
+    .single()
+  if (matchRow?.motm_player_id) affected.add(matchRow.motm_player_id)
+
+  await supabase.from('player_ratings').delete().eq('match_id', matchId)
+  await supabase.from('match_stats').delete().eq('match_id', matchId)
+  const { error } = await supabase.from('matches').delete().eq('id', matchId)
+  if (error) throw error
+
+  for (const pid of affected) {
+    await recomputePlayerStats(pid)
+  }
+}
+
+export async function deleteAllMatches(seasonId?: string): Promise<void> {
+  // Collect match ids in scope
+  let q = supabase.from('matches').select('id')
+  if (seasonId) q = q.eq('season_id', seasonId)
+  const { data: matchRows, error: mErr } = await q
+  if (mErr) throw mErr
+  const ids = (matchRows ?? []).map((m) => m.id)
+  if (ids.length === 0) return
+
+  await supabase.from('player_ratings').delete().in('match_id', ids)
+  await supabase.from('match_stats').delete().in('match_id', ids)
+  const { error } = await supabase.from('matches').delete().in('id', ids)
+  if (error) throw error
+
+  const players = await getPlayers()
+  for (const p of players) {
+    await recomputePlayerStats(p.id)
+  }
+}
+
 // ==================== CURRENT MATCH SETUP ====================
 
 const SETUP_ID = '00000000-0000-0000-0000-000000000001'

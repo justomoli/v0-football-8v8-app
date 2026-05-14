@@ -10,6 +10,7 @@ import {
   getAliasesByPlayerId,
   addAlias,
   deleteAlias,
+  deleteAllMatches,
 } from "@/lib/db"
 import type { Player, PlayerAlias } from "@/lib/types"
 import { tierColor } from "@/lib/rating-tier"
@@ -69,6 +70,8 @@ export function AdminPanel() {
   const [savingEdit, setSavingEdit] = useState(false)
   const [savingNew, setSavingNew] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [wipingHistory, setWipingHistory] = useState(false)
+  const [wipeError, setWipeError] = useState<string | null>(null)
 
   const loadPlayers = useCallback(async () => {
     setLoading(true)
@@ -151,6 +154,20 @@ export function AdminPanel() {
       }
     } catch (error) {
       console.error("Failed to delete alias:", error)
+    }
+  }
+
+  const handleWipeHistory = async () => {
+    setWipingHistory(true)
+    setWipeError(null)
+    try {
+      await deleteAllMatches()
+      await loadPlayers()
+    } catch (e) {
+      console.error("Failed to wipe match history:", e)
+      setWipeError(e instanceof Error ? e.message : "No pudimos borrar el historial.")
+    } finally {
+      setWipingHistory(false)
     }
   }
 
@@ -709,8 +726,74 @@ export function AdminPanel() {
         </DialogContent>
       </Dialog>
 
-      {/* ── Session / logout — danger zone ── */}
+      {/* ── Match history — danger zone ── */}
       <div className="glass rounded-2xl p-5 anim-fade-up delay-2">
+        <div className="flex items-start gap-3 mb-3">
+          <div
+            className="shrink-0 h-10 w-10 rounded-xl flex items-center justify-center"
+            style={{
+              background: "oklch(0.65 0.20 25 / 0.10)",
+              border: "1px solid oklch(0.65 0.20 25 / 0.30)",
+            }}
+          >
+            <Trash2 className="h-4 w-4 text-destructive" />
+          </div>
+          <div className="flex-1 pt-0.5">
+            <h3 className="eyebrow mb-1.5">Historial de partidos</h3>
+            <p className="eyebrow-sub">
+              Borra todos los partidos, ratings y MOTM. Stats de jugadores se recalculan a cero.
+            </p>
+          </div>
+        </div>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button
+              variant="outline"
+              disabled={wipingHistory}
+              className="w-full gap-2 rounded-xl border-destructive/25 text-destructive hover:bg-destructive/10 hover:text-destructive hover:border-destructive/45"
+            >
+              {wipingHistory ? (
+                <>
+                  <Spinner className="h-4 w-4" />
+                  Borrando…
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4" />
+                  Eliminar todo el historial
+                </>
+              )}
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent className="glass-strong border-border/30">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="font-display text-[18px] font-extrabold tracking-tight">
+                Borrar historial
+              </AlertDialogTitle>
+              <AlertDialogDescription className="eyebrow-sub">
+                Se eliminan <strong className="text-foreground/95">todos</strong> los partidos registrados. Esta acción no se puede deshacer.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel className="rounded-xl">Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleWipeHistory}
+                className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/85"
+              >
+                Eliminar todo
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+        {wipeError && (
+          <div className="mt-3 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-[12px] text-destructive/90" role="alert">
+            {wipeError}
+          </div>
+        )}
+      </div>
+
+      {/* ── Session / logout — danger zone ── */}
+      <div className="glass rounded-2xl p-5 anim-fade-up delay-3">
         <div className="flex items-start gap-3 mb-3">
           <div
             className="shrink-0 h-10 w-10 rounded-xl flex items-center justify-center"
